@@ -5,6 +5,7 @@
 #include <gsl/gsl_randist.h>
 
 #include <smpl/types.h>
+#include <smpl/heuristic/bfs_heuristic.h>
 #include <smpl/heuristic/mother_heuristic.h>
 #include <smpl/graph/manip_lattice_multi_rep.h>
 #include <sbpl_collision_checking/shapes.h>
@@ -69,6 +70,11 @@ class UniformlyRandomPolicy : public SchedulingPolicy {
             return 0.5;
         }
 
+        int getAction() override 
+        {
+            throw "Not implemented"; 
+        }
+
     private:
     unsigned int m_seed;
 };
@@ -89,6 +95,11 @@ class RoundRobinPolicy : public SchedulingPolicy {
             return  0.0;
         }
     }
+    
+    int getAction() override 
+    {
+        throw "Not implemented"; 
+    }    
 
     private:
     int m_queue = 0;
@@ -100,7 +111,7 @@ using Point = std::array<double, 2>;
 class DirichletPolicy : public SchedulingPolicy {
     public:
     DirichletPolicy( int _num_queues, unsigned int _seed,
-            smpl::ManipLatticeMultiRep* _manip_space_mr, BfsHeuristic* _base_heur, Point _door_loc ) :
+            smpl::ManipLatticeMultiRep* _manip_space_mr, smpl::BfsHeuristic* _base_heur, Point _door_loc ) :
         SchedulingPolicy(_num_queues),
         m_seed{_seed},
         m_manip_space_mr{_manip_space_mr},
@@ -156,7 +167,7 @@ class DirichletPolicy : public SchedulingPolicy {
 
     private:
     smpl::ManipLatticeMultiRep* m_manip_space_mr;
-    BfsHeuristic* m_base_heur;
+    smpl::BfsHeuristic* m_base_heur;
     Point m_door_loc;
     double m_thresh = 0.8;
     unsigned int m_seed;

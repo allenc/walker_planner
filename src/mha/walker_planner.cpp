@@ -47,7 +47,7 @@ bool constructHeuristics(
     SMPL_INFO("Initialize Heuristics");
     const int DefaultCostMultiplier = 1000;
 
-    struct AnchorHeuristic : public BfsHeuristic {
+    struct AnchorHeuristic : public smpl::CompoundBfsHeuristic {
         int GetGoalHeuristic(int state_id) override {
             return std::max(bfs_3d_base->GetGoalHeuristic(state_id), bfs_3d->GetGoalHeuristic(state_id));
         }
@@ -62,10 +62,10 @@ bool constructHeuristics(
     };
 
     /*
-    struct EndEffHeuristic : public BfsHeuristic {
+    struct EndEffHeuristic : public smpl::CompoundBfsHeuristic {
         bool init(std::shared_ptr<smpl::Bfs3DBaseHeuristic> _bfs_3d_base,
                 std::shared_ptr<smpl::Bfs3DHeuristic> _bfs_3d){
-            if(!BfsHeuristic::init(_bfs_3d_base, _bfs_3d))
+            if(!smpl::CompoundBfsHeuristic::init(_bfs_3d_base, _bfs_3d))
                 return false;
             pose_ext = bfs_3d->planningSpace()->getExtension<smpl::PoseProjectionExtension>();
             return true;
@@ -107,10 +107,10 @@ bool constructHeuristics(
     };
     */
 
-    struct RetractArmHeuristic : public BfsHeuristic {
+    struct RetractArmHeuristic : public smpl::CompoundBfsHeuristic {
         bool init(std::shared_ptr<smpl::Bfs3DBaseHeuristic> _bfs_3d_base,
                 std::shared_ptr<smpl::Bfs3DHeuristic> _bfs_3d){
-            if(!BfsHeuristic::init(_bfs_3d_base, _bfs_3d))
+            if(!smpl::CompoundBfsHeuristic::init(_bfs_3d_base, _bfs_3d))
                 return false;
             return true;
         }
@@ -157,11 +157,11 @@ bool constructHeuristics(
 
     };
 
-    struct ImprovedEndEffHeuristic : public BfsHeuristic {
+    struct ImprovedEndEffHeuristic : public smpl::CompoundBfsHeuristic {
         bool init(std::shared_ptr<smpl::Bfs3DBaseHeuristic> _bfs_3d_base,
                 std::shared_ptr<smpl::Bfs3DHeuristic> _bfs_3d,
                 std::shared_ptr<RetractArmHeuristic> _retract_arm){
-            if(!BfsHeuristic::init(_bfs_3d_base, _bfs_3d))
+            if(!smpl::CompoundBfsHeuristic::init(_bfs_3d_base, _bfs_3d))
                 return false;
             m_retract_arm_heur = _retract_arm;
             pose_ext = bfs_3d->planningSpace()->getExtension<smpl::PoseProjectionExtension>();
@@ -212,12 +212,12 @@ bool constructHeuristics(
         smpl::PoseProjectionExtension* pose_ext = nullptr;
     };
 
-    struct BaseRotHeuristic : public BfsHeuristic {
+    struct BaseRotHeuristic : public smpl::CompoundBfsHeuristic {
         bool init(std::shared_ptr<smpl::Bfs3DBaseHeuristic> _bfs_3d_base,
                 std::shared_ptr<smpl::Bfs3DHeuristic> _bfs_3d,
                 std::shared_ptr<RetractArmHeuristic> _retract_arm,
                 double _orientation){
-            if(!BfsHeuristic::init(_bfs_3d_base, _bfs_3d))
+            if(!smpl::CompoundBfsHeuristic::init(_bfs_3d_base, _bfs_3d))
                 return false;
             m_retract_arm_heur = _retract_arm;
             orientation = _orientation;
@@ -741,7 +741,7 @@ int main(int argc, char** argv){
             auto objects = GetMultiRoomMapCollisionCubes(grid_ptr->getReferenceFrame(), map_config, landmarks );
             ROS_ERROR("Landmarks: %d", landmarks.size());
             auto features = computePlanFeatures(plan_stats,
-                    dynamic_cast<BfsHeuristic*>(anchor_heur)->bfs_3d_base.get(),
+                    dynamic_cast<smpl::CompoundBfsHeuristic*>(anchor_heur)->bfs_3d_base.get(),
                     landmarks[0]);
             ROS_ERROR("Features size: %d", features.x_rel_door.size());
             for(int i=0; i<features.x_rel_door.size(); i++){

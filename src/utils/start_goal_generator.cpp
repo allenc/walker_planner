@@ -7,7 +7,7 @@
 #include "utils/start_goal_generator.h"
 #include "utils/utils.h"
 
-#define PI 3.14
+// #define PI 3.14
 
 bool Region::isValid(std::vector<double> _state){
     assert(subregions.size());

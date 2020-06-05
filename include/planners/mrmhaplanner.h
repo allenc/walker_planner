@@ -9,7 +9,7 @@
 #include <smpl/heap/intrusive_heap.h>
 #include <smpl/console/console.h>
 
-#define INFINITECOST std::numeric_limits<int>::max()
+// #define INFINITECOST std::numeric_limits<int>::max()
 
 /**
  * N : Number of queues
