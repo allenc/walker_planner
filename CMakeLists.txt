@@ -20,6 +20,7 @@ find_package(catkin REQUIRED COMPONENTS
   sbpl_collision_checking
   sbpl_kdl_robot_model
   trac_ik_robot_model
+  smpl_ros  
   smpl_ompl_interface
   smpl_moveit_interface
   visualization_msgs
@@ -189,6 +190,24 @@ add_executable( generate_critical_states
   ${CRITICAL}
   ${AUXILIARY}) 
 target_link_libraries( generate_critical_states ${catkin_LIBRARIES} smpl::smpl )
+
+add_executable( visualize_generated_critical_states
+  src/debug/visualize_generated_critical_states.cpp
+  src/config/collision_space_scene.cpp
+  src/config/get_collision_objects.cpp
+  src/config/planner_config.cpp
+  ${CRITICAL}
+  ${AUXILIARY})
+target_link_libraries( visualize_generated_critical_states ${catkin_LIBRARIES} smpl::smpl )
+
+add_executable( visualize_generated_roadmap_states
+  src/debug/visualize_generated_roadmap_states.cpp
+  src/config/collision_space_scene.cpp
+  src/config/get_collision_objects.cpp
+  src/config/planner_config.cpp
+  ${CRITICAL}
+  ${AUXILIARY})
+target_link_libraries( visualize_generated_roadmap_states ${catkin_LIBRARIES} smpl::smpl )
 
 add_executable(generate_map
     src/utils/generate_map.cpp

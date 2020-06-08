@@ -38,6 +38,105 @@
 #include "config/collision_space_scene.h"
 #include "config/get_collision_objects.h"
 
+static
+bool ReadPR2RobotStatesFromFile(
+    const std::string& traj_filename, 
+    std::vector<smpl::RobotState>& traj)
+{
+    traj.clear(); 
+    std::ifstream f(traj_filename); 
+    std::string line; 
+    while (std::getline(f, line)) {
+
+        std::istringstream iss(line);
+        std::string line_stream; 
+
+        smpl::RobotState row; 
+        while (std::getline(iss, line_stream, ',')) {
+            row.push_back(std::stod(line_stream)); 
+        }
+
+        traj.push_back(row); 
+    }
+    return true; 
+}
+
+static
+bool ReadCriticalScoresFromFile(
+    const std::string& filename, 
+    std::vector<int>& v_int)
+{
+    v_int.clear(); 
+    std::ifstream f(filename); 
+    std::string line; 
+    while (std::getline(f, line)) {
+
+        std::istringstream iss(line);
+        std::string line_stream; 
+
+        std::getline(iss, line_stream); 
+
+        v_int.push_back(std::stoi(line_stream)); 
+    }
+    
+    return true;     
+}
+
+static
+auto MakeTopKCriticalPathVisualization(
+    smpl::CollisionChecker* cc, 
+    int& top_k, 
+    const std::vector<smpl::RobotState>& path,
+    const std::vector<float>& rgb_crit,
+    const std::vector<float>& rgb_noncrit,     
+    const std::vector<double>& opacity,     
+    const std::string& ns_crit, 
+    const std::string& ns_noncrit)
+    -> std::pair< std::vector<smpl::visual::Marker>, std::vector<smpl::visual::Marker> >
+{
+    std::vector<smpl::visual::Marker> ma_crit;
+    std::vector<smpl::visual::Marker> ma_noncrit;    
+
+    auto cinc = 1.0f / float(path.size());
+    for (size_t i = 0; i < path.size(); ++i) {
+        auto markers = cc->getCollisionModelVisualization(path[i]);
+
+        for (auto& marker : markers) {
+            if (i < top_k) {
+                marker.color = smpl::visual::Color{ rgb_crit[0], rgb_crit[1], 
+                    rgb_crit[2], 1.0 };
+            } else {
+                marker.color = smpl::visual::Color{ rgb_noncrit[0], rgb_noncrit[1],
+                    rgb_noncrit[2], (float)opacity[i] }; 
+            }
+        }
+
+        for (auto& m : markers) {
+            if (i < top_k) {
+                ma_crit.push_back(std::move(m));
+            } else {
+                ma_noncrit.push_back(std::move(m)); 
+            }
+        }
+    }
+
+    for (size_t i = 0; i < ma_crit.size(); ++i) {
+        auto& marker = ma_crit[i];
+        marker.ns = ns_crit; 
+        marker.id = i;
+    }
+
+    for (size_t i = 0; i < ma_noncrit.size(); ++i) {
+        auto& marker = ma_noncrit[i];
+        marker.ns = ns_noncrit; 
+        marker.id = i;
+    }    
+
+    return std::make_pair<
+        std::vector<smpl::visual::Marker>,
+        std::vector<smpl::visual::Marker> >(std::move(ma_crit), std::move(ma_noncrit));   
+}
+
 auto ConstructStateSpace(
     const urdf::ModelInterface& urdf,
     const std::vector<std::string>& planning_joints)
@@ -253,7 +352,8 @@ int main(int argc, char* argv[])
     auto df_size_x = 20.0;
     auto df_size_y = 15.0;
     auto df_size_z = 1.5;
-    auto df_res = 0.05;
+    // auto df_res = 0.05;
+    auto df_res = 0.1;    
     auto df_origin_x = 0.0;
     auto df_origin_y = 0.0;
     auto df_origin_z = 0.0;
@@ -357,79 +457,52 @@ int main(int argc, char* argv[])
 
     cc.setWorldToModelTransform(Eigen::Affine3d::Identity());
 
-    //SV_SHOW_INFO(grid.getDistanceFieldVisualization(0.2));
+    /////////////////////
+    // Visualizations  //
+    /////////////////////
 
-    //SV_SHOW_INFO(cc.getCollisionRobotVisualization());
-    //SV_SHOW_INFO(cc.getCollisionWorldVisualization());
-    //SV_SHOW_INFO(cc.getOccupiedVoxelsVisualization());
+    // To Do: Move these to rosparams
+    std::string f_vertices = "/home/allen/catkin_ws/src/walker_planner/critical_roadmaps/test/crit_roadmap_vertices.csv"; 
+    std::string f_scores = "/home/allen/catkin_ws/src/walker_planner/critical_roadmaps/test/crit_roadmap_scores.csv"; 
 
-    ///////////////////
-    // Planner Setup //
-    ///////////////////
+    std::vector<smpl::RobotState> crit_states; 
+    ReadPR2RobotStatesFromFile(f_vertices, crit_states);     
 
-    ROS_INFO("Initialize the planner");
+    std::vector<int> crit_scores; 
+    ReadCriticalScoresFromFile(f_scores, crit_scores);    
 
-    // Construct state space from the urdf + planning group...
-    auto urdf = urdf::parseURDF(robot_description);
-    if (!urdf) {
-        ROS_ERROR("Failed to parse URDF");
-        return 1;
-    }
+    // Compute normalized scores 
+    std::vector<double> crit_scores_norm(crit_scores.begin(), crit_scores.end()); 
+    double max_score = *(std::max_element(crit_scores_norm.begin(), crit_scores_norm.end()));     
 
-    auto state_space = ConstructStateSpace(*urdf, robot_config.planning_joints);
+    std::transform(crit_scores_norm.begin(), crit_scores_norm.end(), 
+        crit_scores_norm.begin(), [max_score](double& n){return n/max_score; });     
 
-    ompl::geometric::SimpleSetup ss(state_space);
+    // VIsualize critical states with relative opacity 
+    std::string ns_crit = "critical_config"; 
+    std::string ns_noncrit = "noncritical_config";         
+    std::vector<float> rgb_crit = { 1.0, 0.0, 0.0};     
+    std::vector<float> rgb_noncrit = { 0.0, 1.0, 0.0};           
 
-    // Use CollisionSpace as the collision checker...
-    ss.setStateValidityChecker([&](const ompl::base::State* state)
-    {
-        std::vector<double> values;// = state->reals();
-        state_space->copyToReals(values, state);
-        return cc.isStateValid(values);
-    });
+    int top_k;    
+    ph.param("top_k", top_k, 10); 
 
-    // Set up a projection evaluator to provide forward kinematics...
-    auto* fk_projection = new ProjectionEvaluatorFK(state_space);
-    fk_projection->model = rm.get();
-    state_space->registerProjection(
-            "fk", ompl::base::ProjectionEvaluatorPtr(fk_projection));
+    ROS_INFO("Visualizing top %d critical states", top_k); 
 
-    //////////////
-    // Planning //
-    //////////////
+    auto crit_markers = MakeTopKCriticalPathVisualization(&cc, top_k, 
+        crit_states, rgb_crit, rgb_noncrit, crit_scores_norm, ns_crit, ns_noncrit);  
 
-    ROS_INFO("Setup the query");
-
-    // Initialize random start/goal, only for ss setup not used in crit prm construction
-    ompl::base::ScopedState<ompl::base::CompoundStateSpace> start(state_space);
-    start.random(); 
-    ss.setStartState(start); 
-
-    ompl::base::ScopedState<ompl::base::CompoundStateSpace> goal(state_space);
-    goal.random(); 
-    ss.setGoalState(goal); 
-
-    // Initialize critical roadmap construction parameters 
-    smpl::ConstructionConfig cfg; // To Do: Move these to rosparams
-    cfg.using_star_strategy = false; 
-    cfg.grow_time = 60.0; 
-    cfg.expand_time = 1.0;     
-    cfg.num_sampled_starts = 50; 
-    cfg.num_sampled_goals_per_start = 200; 
-    cfg.save_roadmap = true; 
-    cfg.save_dir = "/home/allen/catkin_ws/src/walker_planner/critical_roadmaps/test"; 
-
-    ss.setup(); 
-    auto crit_ctor = smpl::CriticalPRMConstructor(ss, cfg);
-    crit_ctor.constructCriticalPRM(); 
-
-    // Vis 
-    ROS_INFO("Visualizing scene"); 
     while (ros::ok()) {
+
+        // Vis scene
         SV_SHOW_INFO(cc.getCollisionRobotVisualization());
         SV_SHOW_INFO(cc.getCollisionWorldVisualization());
         SV_SHOW_INFO(grid.getOccupiedVoxelsVisualization());        
         SV_SHOW_INFO(grid.getBoundingBoxVisualization());                        
+
+        // Vis crit roadmap 
+        SV_SHOW_INFO(crit_markers.first);
+        SV_SHOW_INFO(crit_markers.second);
         std::this_thread::sleep_for(std::chrono::milliseconds(10));        
     }
     

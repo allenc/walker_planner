@@ -30,6 +30,7 @@
 #include <smpl/distance_map/euclid_distance_map.h>
 #include <smpl/planning_params.h>
 #include <smpl_ompl_interface/ompl_interface.h>
+#include <smpl/debug/marker_conversions.h> 
 #include <urdf_parser/urdf_parser.h>
 
 #include "critical_roadmap/critical_prm.h"
@@ -37,6 +38,143 @@
 #include "config/planner_config.h"
 #include "config/collision_space_scene.h"
 #include "config/get_collision_objects.h"
+
+static
+bool ReadPR2RobotStatesFromFile(
+    const std::string& traj_filename, 
+    std::vector<smpl::RobotState>& traj)
+{
+    traj.clear(); 
+    std::ifstream f(traj_filename); 
+    std::string line; 
+    while (std::getline(f, line)) {
+
+        std::istringstream iss(line);
+        std::string line_stream; 
+
+        smpl::RobotState row; 
+        while (std::getline(iss, line_stream, ',')) {
+            row.push_back(std::stod(line_stream)); 
+        }
+
+        traj.push_back(row); 
+    }
+    ROS_INFO("Read %zu states from file %s", 
+        traj.size(), traj_filename.c_str()); 
+    return true; 
+}
+
+static
+auto MakePathVisualization(
+    smpl::CollisionChecker* cc, 
+    const std::vector<smpl::RobotState>& path, 
+    const std::vector<float>& rgba, 
+    const std::string& ns)
+    -> std::vector<smpl::visual::Marker>
+{
+    std::vector<smpl::visual::Marker> ma;
+
+    if (path.empty()) {
+        return ma;
+    }
+
+    auto cinc = 1.0f / float(path.size());
+    for (size_t i = 0; i < path.size(); ++i) {
+        auto markers = cc->getCollisionModelVisualization(path[i]);
+
+        for (auto& marker : markers) {
+            auto r = rgba[0]; 
+            auto g = rgba[1]; 
+            auto b = rgba[2]; 
+            auto a = rgba[3]; 
+            marker.color = smpl::visual::Color{ r, g, b, a };
+        }
+
+        for (auto& m : markers) {
+            ma.push_back(std::move(m));
+        }
+    }
+
+    for (size_t i = 0; i < ma.size(); ++i) {
+        auto& marker = ma[i];
+        marker.ns = ns; 
+        marker.id = i;
+    }
+
+    return ma;
+}
+
+
+// Instead of actually visualizing the entire robot config, just use a block
+// at the robot's base, because rviz sucks
+
+static 
+auto GetSimpleModelVisualization(
+    const smpl::RobotState& s, 
+    const std::vector<float>& rgba,     
+    const std::string& frame_id,     
+    const std::string& ns) 
+    -> smpl::visual::Marker
+{
+    visualization_msgs::Marker m; 
+    m.header.frame_id = frame_id; 
+    m.ns = ns; 
+    m.type = visualization_msgs::Marker::SPHERE; 
+    m.action = visualization_msgs::Marker::ADD; 
+
+    m.pose.position.x = s[0]; 
+    m.pose.position.y = s[1]; 
+    m.pose.position.z = 0.0;         
+
+    m.pose.orientation.x = 0.0; 
+    m.pose.orientation.y = 0.0; 
+    m.pose.orientation.z = 0.0; 
+    m.pose.orientation.w = 1.0;  
+
+    m.scale.x = 0.05; 
+    m.scale.y = 0.05; 
+    m.scale.z = 0.05;         
+
+    m.color.r = rgba[0]; 
+    m.color.g = rgba[1]; 
+    m.color.b = rgba[2];         
+    m.color.a = rgba[3]; 
+
+
+    smpl::visual::Marker m_smpl; 
+    smpl::visual::ConvertMarkerMsgToMarker(m, m_smpl); 
+    return m_smpl;
+}
+
+static 
+auto MakeSimplePathVisualization(
+    smpl::CollisionChecker* cc, 
+    const std::vector<smpl::RobotState>& path, 
+    const std::vector<float>& rgba, 
+    const std::string& frame_id, 
+    const std::string& ns)
+    -> std::vector<smpl::visual::Marker>
+{
+    std::vector<smpl::visual::Marker> ma;
+
+    if (path.empty()) {
+        return ma;
+    }
+
+    for (size_t i = 0; i < path.size(); ++i) {
+        auto m = GetSimpleModelVisualization(path[i], rgba, frame_id, ns); 
+
+        ma.push_back(std::move(m)); 
+    }
+
+    // set id 
+    for (size_t i = 0; i < ma.size(); ++i) {
+        auto& marker = ma[i];
+        marker.id = i;
+    }
+
+    return ma;
+}
 
 auto ConstructStateSpace(
     const urdf::ModelInterface& urdf,
@@ -253,7 +391,8 @@ int main(int argc, char* argv[])
     auto df_size_x = 20.0;
     auto df_size_y = 15.0;
     auto df_size_z = 1.5;
-    auto df_res = 0.05;
+    // auto df_res = 0.05;
+    auto df_res = 0.1;    
     auto df_origin_x = 0.0;
     auto df_origin_y = 0.0;
     auto df_origin_z = 0.0;
@@ -357,79 +496,39 @@ int main(int argc, char* argv[])
 
     cc.setWorldToModelTransform(Eigen::Affine3d::Identity());
 
-    //SV_SHOW_INFO(grid.getDistanceFieldVisualization(0.2));
+    /////////////////////
+    // Visualizations  //
+    /////////////////////
 
-    //SV_SHOW_INFO(cc.getCollisionRobotVisualization());
-    //SV_SHOW_INFO(cc.getCollisionWorldVisualization());
-    //SV_SHOW_INFO(cc.getOccupiedVoxelsVisualization());
+    // To Do: Move these to rosparams
+    std::string f_vertices = "/home/allen/catkin_ws/src/walker_planner/critical_roadmaps/test/all_roadmap_vertices.csv"; 
 
-    ///////////////////
-    // Planner Setup //
-    ///////////////////
+    std::vector<smpl::RobotState> roadmap_states; 
+    ReadPR2RobotStatesFromFile(f_vertices, roadmap_states);     
 
-    ROS_INFO("Initialize the planner");
 
-    // Construct state space from the urdf + planning group...
-    auto urdf = urdf::parseURDF(robot_description);
-    if (!urdf) {
-        ROS_ERROR("Failed to parse URDF");
-        return 1;
-    }
+    // because my computer can't actually handle this 
+    int num_vis_states = 500;
+    std::vector<smpl::RobotState> roadmap_states_trunc(roadmap_states.begin(), 
+        roadmap_states.begin() + num_vis_states); 
 
-    auto state_space = ConstructStateSpace(*urdf, robot_config.planning_joints);
+    // VIsualize critical states with relative opacity 
+    std::string ns = "roadmap_config"; 
+    std::vector<float> rgba = { 0.0, 1.0, 0.0, 1.0};
 
-    ompl::geometric::SimpleSetup ss(state_space);
+    // auto roadmap_markers = MakePathVisualization(&cc, roadmap_states, rgba, ns);   
+    auto roadmap_markers = MakeSimplePathVisualization(&cc, roadmap_states_trunc, rgba, planning_frame, ns); 
 
-    // Use CollisionSpace as the collision checker...
-    ss.setStateValidityChecker([&](const ompl::base::State* state)
-    {
-        std::vector<double> values;// = state->reals();
-        state_space->copyToReals(values, state);
-        return cc.isStateValid(values);
-    });
-
-    // Set up a projection evaluator to provide forward kinematics...
-    auto* fk_projection = new ProjectionEvaluatorFK(state_space);
-    fk_projection->model = rm.get();
-    state_space->registerProjection(
-            "fk", ompl::base::ProjectionEvaluatorPtr(fk_projection));
-
-    //////////////
-    // Planning //
-    //////////////
-
-    ROS_INFO("Setup the query");
-
-    // Initialize random start/goal, only for ss setup not used in crit prm construction
-    ompl::base::ScopedState<ompl::base::CompoundStateSpace> start(state_space);
-    start.random(); 
-    ss.setStartState(start); 
-
-    ompl::base::ScopedState<ompl::base::CompoundStateSpace> goal(state_space);
-    goal.random(); 
-    ss.setGoalState(goal); 
-
-    // Initialize critical roadmap construction parameters 
-    smpl::ConstructionConfig cfg; // To Do: Move these to rosparams
-    cfg.using_star_strategy = false; 
-    cfg.grow_time = 60.0; 
-    cfg.expand_time = 1.0;     
-    cfg.num_sampled_starts = 50; 
-    cfg.num_sampled_goals_per_start = 200; 
-    cfg.save_roadmap = true; 
-    cfg.save_dir = "/home/allen/catkin_ws/src/walker_planner/critical_roadmaps/test"; 
-
-    ss.setup(); 
-    auto crit_ctor = smpl::CriticalPRMConstructor(ss, cfg);
-    crit_ctor.constructCriticalPRM(); 
-
-    // Vis 
-    ROS_INFO("Visualizing scene"); 
     while (ros::ok()) {
+
+        // Vis scene
         SV_SHOW_INFO(cc.getCollisionRobotVisualization());
         SV_SHOW_INFO(cc.getCollisionWorldVisualization());
         SV_SHOW_INFO(grid.getOccupiedVoxelsVisualization());        
         SV_SHOW_INFO(grid.getBoundingBoxVisualization());                        
+
+        // Vis crit roadmap 
+        SV_SHOW_INFO(roadmap_markers);
         std::this_thread::sleep_for(std::chrono::milliseconds(10));        
     }
     

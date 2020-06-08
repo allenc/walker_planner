@@ -215,7 +215,7 @@ bool CriticalPRMConstructor::runProblemInstance(
 	ompl::base::State* start,
 	ompl::base::State* goal) 
 {
-	bool debugging = true; 
+	bool debugging = false; 
 	std::string obj_type = "path_length"; // Do I need others?
 
 
