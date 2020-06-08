@@ -40,6 +40,7 @@ include_directories(SYSTEM ${catkin_INCLUDE_DIRS})
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 include_directories(SYSTEM ${orocos_kdl_INCLUDE_DIRS})
+#include_directories(SYSTEM ${OMPL_INCLUDE_DIRS})
 #include_directories(SYSTEM "~/lolocal/include/gsl")
 #include_directories(SYSTEM ${CATKIN_DEVEL_PREFIX}/include})
 
@@ -82,12 +83,19 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
+
+
+set( CRITICAL 
+    src/critical_roadmap/critical_prm.cpp
+    src/critical_roadmap/critical_prm_constructor.cpp)
+
 set( PLANNERS
     src/planners/rmhaplanner.cpp)
     #src/planners/mrmhaplanner.cpp)
 
-set (AUXILIARY
+set( AUXILIARY
     src/utils/utils.cpp)
+
 
 add_executable(collision_model_visualizer src/debug/collision_model_visualizer.cpp
     src/config/collision_space_scene.cpp)
@@ -169,8 +177,18 @@ add_executable( test_ompl_planner
     src/test_ompl_planner.cpp
     src/config/collision_space_scene.cpp
     src/config/get_collision_objects.cpp
-    src/config/planner_config.cpp)
+    src/config/planner_config.cpp
+    ${AUXILIARY})    
 target_link_libraries( test_ompl_planner ${catkin_LIBRARIES} smpl::smpl )
+
+add_executable( generate_critical_states
+  src/critical_roadmap/generate_critical_states.cpp
+  src/config/collision_space_scene.cpp
+  src/config/get_collision_objects.cpp
+  src/config/planner_config.cpp
+  ${CRITICAL}
+  ${AUXILIARY}) 
+target_link_libraries( generate_critical_states ${catkin_LIBRARIES} smpl::smpl )
 
 add_executable(generate_map
     src/utils/generate_map.cpp
