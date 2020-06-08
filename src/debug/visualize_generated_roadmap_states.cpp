@@ -27,10 +27,10 @@
 #include <sbpl_kdl_robot_model/kdl_robot_model.h>
 #include <smpl/angles.h>
 #include <smpl/debug/visualizer_ros.h>
+#include <smpl/debug/marker_conversions.h> 
 #include <smpl/distance_map/euclid_distance_map.h>
 #include <smpl/planning_params.h>
 #include <smpl_ompl_interface/ompl_interface.h>
-#include <smpl/debug/marker_conversions.h> 
 #include <urdf_parser/urdf_parser.h>
 
 #include "critical_roadmap/critical_prm.h"
@@ -105,7 +105,7 @@ auto MakePathVisualization(
 }
 
 
-// Instead of actually visualizing the entire robot config, just use a block
+// Instead of actually visualizing the entire robot config, just use a sphere
 // at the robot's base, because rviz sucks
 
 static 

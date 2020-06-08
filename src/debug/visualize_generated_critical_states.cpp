@@ -27,6 +27,7 @@
 #include <sbpl_kdl_robot_model/kdl_robot_model.h>
 #include <smpl/angles.h>
 #include <smpl/debug/visualizer_ros.h>
+#include <smpl/debug/marker_conversions.h> 
 #include <smpl/distance_map/euclid_distance_map.h>
 #include <smpl/planning_params.h>
 #include <smpl_ompl_interface/ompl_interface.h>
@@ -80,6 +81,99 @@ bool ReadCriticalScoresFromFile(
     }
     
     return true;     
+}
+
+static 
+auto GetSimpleModelVisualization(
+    const smpl::RobotState& s, 
+    const std::vector<float>& rgba,     
+    const std::string& frame_id,     
+    const std::string& ns) 
+    -> smpl::visual::Marker
+{
+    visualization_msgs::Marker m; 
+    m.header.frame_id = frame_id; 
+    m.ns = ns; 
+    m.type = visualization_msgs::Marker::SPHERE; 
+    m.action = visualization_msgs::Marker::ADD; 
+
+    m.pose.position.x = s[0]; 
+    m.pose.position.y = s[1]; 
+    m.pose.position.z = 0.0;         
+
+    m.pose.orientation.x = 0.0; 
+    m.pose.orientation.y = 0.0; 
+    m.pose.orientation.z = 0.0; 
+    m.pose.orientation.w = 1.0;  
+
+    m.scale.x = 0.05; 
+    m.scale.y = 0.05; 
+    m.scale.z = 0.05;         
+
+    m.color.r = rgba[0]; 
+    m.color.g = rgba[1]; 
+    m.color.b = rgba[2];         
+    m.color.a = rgba[3]; 
+
+    smpl::visual::Marker m_smpl; 
+    smpl::visual::ConvertMarkerMsgToMarker(m, m_smpl); 
+    return m_smpl;
+}
+
+static
+auto MakeSimpleTopKCriticalPathVisualization(
+    smpl::CollisionChecker* cc, 
+    int& top_k, 
+    const std::vector<smpl::RobotState>& path,
+    const std::vector<float>& rgb_crit,
+    const std::vector<float>& rgb_noncrit,     
+    const std::vector<double>& opacity,     
+    const std::string& frame_id,
+    const std::string& ns_crit, 
+    const std::string& ns_noncrit)
+    -> std::pair< std::vector<smpl::visual::Marker>, std::vector<smpl::visual::Marker> >
+{
+    std::vector<smpl::visual::Marker> ma_crit;
+    std::vector<smpl::visual::Marker> ma_noncrit;    
+
+    auto cinc = 1.0f / float(path.size());
+    for (size_t i = 0; i < path.size(); ++i) {
+
+        if (i < top_k) {
+            // Critical state case
+            auto markers = cc->getCollisionModelVisualization(path[i]); 
+            for (auto& m : markers) {            
+                m.color = smpl::visual::Color{ rgb_crit[0], rgb_crit[1], 
+                    rgb_crit[2], 1.0 };
+                ma_crit.push_back(std::move(m)); 
+            }
+            // for (auto& m : markers) {
+            //     ma_crit.push_back(std::move(m)); 
+            // }
+        } else {
+            // Non-critical case, using sphere at the base
+            std::vector<float> rgba_noncrit = { rgb_noncrit[0], rgb_noncrit[1], 
+                rgb_noncrit[2], (float)opacity[i] }; 
+            auto m = GetSimpleModelVisualization(path[i], rgba_noncrit, frame_id,
+                ns_noncrit); 
+            ma_noncrit.push_back(std::move(m)); 
+        }
+    }
+
+    for (size_t i = 0; i < ma_crit.size(); ++i) {
+        auto& marker = ma_crit[i];
+        marker.ns = ns_crit; 
+        marker.id = i;
+    }
+
+    for (size_t i = 0; i < ma_noncrit.size(); ++i) {
+        auto& marker = ma_noncrit[i];
+        marker.id = i;
+    }    
+
+    return std::make_pair<
+        std::vector<smpl::visual::Marker>,
+        std::vector<smpl::visual::Marker> >(std::move(ma_crit), std::move(ma_noncrit));   
 }
 
 static
@@ -489,8 +583,12 @@ int main(int argc, char* argv[])
 
     ROS_INFO("Visualizing top %d critical states", top_k); 
 
-    auto crit_markers = MakeTopKCriticalPathVisualization(&cc, top_k, 
-        crit_states, rgb_crit, rgb_noncrit, crit_scores_norm, ns_crit, ns_noncrit);  
+    // auto crit_markers = MakeTopKCriticalPathVisualization(&cc, top_k, 
+    //     crit_states, rgb_crit, rgb_noncrit, crit_scores_norm, ns_crit, ns_noncrit);  
+
+    auto crit_markers = MakeSimpleTopKCriticalPathVisualization(&cc, top_k, 
+        crit_states, rgb_crit, rgb_noncrit, crit_scores_norm, planning_frame, 
+        ns_crit, ns_noncrit); 
 
     while (ros::ok()) {
 

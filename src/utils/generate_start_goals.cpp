@@ -379,7 +379,8 @@ int main(int argc, char** argv){
     addStartRegionsForRoom5(generator, fullbody_rm.get(), map_config.x_max, map_config.y_max);
     addGoalRegionsForTable(generator, fullbody_rm.get(), tables);
 
-    const int N = 500;
+    // const int N = 500;
+    const int N = 10; 
     auto status = generator.generate(N);
     if(status)
         ROS_INFO("Generated %d start-goal pairs.", N);
@@ -387,6 +388,8 @@ int main(int argc, char** argv){
         ROS_ERROR("Could not generate start-goal pairs.");
     generator.writeToFile(
             "x y theta right_j1 right_j2 right_j3 right_j4 right_j5 right_j6 right_j7\n",
-            "start_states.txt", "goal_states.txt", "goal_poses.txt");
+            "/home/allen/catkin_ws/src/walker_planner/experiments/start_states.txt", 
+            "/home/allen/catkin_ws/src/walker_planner/experiments/goal_states.txt",  
+            "/home/allen/catkin_ws/src/walker_planner/experiments/goal_poses.txt"); 
 }
 
