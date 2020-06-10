@@ -209,6 +209,15 @@ add_executable( visualize_generated_roadmap_states
   ${AUXILIARY})
 target_link_libraries( visualize_generated_roadmap_states ${catkin_LIBRARIES} smpl::smpl )
 
+add_executable( visualize_experiment
+  src/debug/visualize_experiment.cpp
+  src/config/collision_space_scene.cpp
+  src/config/get_collision_objects.cpp
+  src/config/planner_config.cpp
+  ${CRITICAL}
+  ${AUXILIARY})
+target_link_libraries( visualize_experiment ${catkin_LIBRARIES} smpl::smpl )
+
 add_executable(generate_map
     src/utils/generate_map.cpp
     src/config/planner_config.cpp

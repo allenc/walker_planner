@@ -46,9 +46,6 @@ namespace ompl {
 					row.push_back(std::stod(line_stream)); 
 				}
 
-				if (row.size() != 7) {
-					return false; 
-				}
 				v_rs.push_back(row); 
 			}
 
