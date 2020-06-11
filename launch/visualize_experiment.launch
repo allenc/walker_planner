@@ -48,8 +48,7 @@ required="true" />
         <rosparam command="load" file="$(find walker_planner)/config/collision_model_walker.yaml"/>
 
         <!-- visualization params -->
-        <rosparam command="load" file="$(find
-        walker_planner)/critical_experiments/$(arg scenario)/$(arg scenario)$(arg exp).yaml"/>        
+        <rosparam command="load" file="$(find walker_planner)/critical_experiments/$(arg scenario)/$(arg scenario)$(arg exp).yaml"/>
 
         <!-- environment params -->
         <rosparam command="load" file="$(find walker_planner)/env/$(arg scenario)_map.yaml"/>  

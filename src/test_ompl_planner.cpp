@@ -17,10 +17,9 @@
 #include <ompl/base/spaces/SE3StateSpace.h>
 #include <ompl/base/spaces/SO2StateSpace.h>
 #include <ompl/geometric/SimpleSetup.h>
-#include <ompl/geometric/planners/sbl/SBL.h>
-#include <ompl/geometric/planners/rrt/RRT.h>
+#include <ompl/geometric/planners/prm/PRM.h>
 #include <ompl/geometric/planners/rrt/RRTConnect.h>
-#include <ompl/geometric/planners/bitstar/BITstar.h>
+#include <ompl/base/objectives/PathLengthOptimizationObjective.h>
 #include <ros/ros.h>
 #include <sbpl_collision_checking/collision_space.h>
 #include <sbpl_kdl_robot_model/kdl_robot_model.h>
@@ -31,6 +30,8 @@
 #include <smpl_ompl_interface/ompl_interface.h>
 #include <urdf_parser/urdf_parser.h>
 
+#include "critical_roadmap/critical_prm.h"
+#include "critical_roadmap/critical_prm_constructor.h"
 #include "config/planner_config.h"
 #include "config/collision_space_scene.h"
 #include "config/get_collision_objects.h"
@@ -190,6 +191,39 @@ void ProjectionEvaluatorFK::printProjection(
     this->Base::printProjection(projection, out);
 }
 
+struct ExperimentConfig 
+{
+    // plan params
+    std::string ompl_planner;     
+    std::string roadmap_filename;
+    std::string crit_states_filename;
+    double allowed_planning_time;     
+    std::string exp_id;     
+
+    // plan res params
+    bool use_post_processing;     
+    bool use_visualization; 
+    bool use_logging;    
+    std::string log_filename;         
+}; 
+
+static 
+void ReadExperimentConfig(const ros::NodeHandle& nh, ExperimentConfig& cfg)
+{
+    nh.param<std::string>("ompl_planner", cfg.ompl_planner, "prm"); 
+    nh.param<std::string>("roadmap_filename", cfg.roadmap_filename, "");
+    nh.param<std::string>("crit_states_filename", cfg.crit_states_filename, "");
+    nh.param<double>("allowed_planning_time", cfg.allowed_planning_time, 60.0);
+    nh.param<std::string>("exp_id", cfg.exp_id, "0"); 
+    nh.param<bool>("use_post_processing", cfg.use_post_processing, true); 
+    nh.param<bool>("use_visualization", cfg.use_visualization, false);     
+    nh.param<bool>("use_logging", cfg.use_logging, false);     
+
+    if (cfg.use_logging) {
+        nh.param<std::string>("log_filename", cfg.log_filename, ""); 
+    }
+}
+
 int main(int argc, char* argv[])
 {
     ros::init(argc, argv, "test_ompl_planner");
@@ -202,6 +236,12 @@ int main(int argc, char* argv[])
 
     // Let publishers set up
     ros::Duration(1.0).sleep();
+
+    //////////////////////
+    //  Read ROS Params // 
+    //////////////////////
+    ExperimentConfig cfg; 
+    ReadExperimentConfig(ph, cfg); 
 
     /////////////////
     // Robot Model //
@@ -250,7 +290,8 @@ int main(int argc, char* argv[])
     auto df_size_x = 20.0;
     auto df_size_y = 15.0;
     auto df_size_z = 1.5;
-    auto df_res = 0.05;
+    auto df_res = 0.1;    
+    // auto df_res = 0.05;
     auto df_origin_x = 0.0;
     auto df_origin_y = 0.0;
     auto df_origin_z = 0.0;
@@ -354,12 +395,6 @@ int main(int argc, char* argv[])
 
     cc.setWorldToModelTransform(Eigen::Affine3d::Identity());
 
-    //SV_SHOW_INFO(grid.getDistanceFieldVisualization(0.2));
-
-    //SV_SHOW_INFO(cc.getCollisionRobotVisualization());
-    //SV_SHOW_INFO(cc.getCollisionWorldVisualization());
-    //SV_SHOW_INFO(cc.getOccupiedVoxelsVisualization());
-
     ///////////////////
     // Planner Setup //
     ///////////////////
@@ -391,188 +426,134 @@ int main(int argc, char* argv[])
     state_space->registerProjection(
             "fk", ompl::base::ProjectionEvaluatorPtr(fk_projection));
 
-    // Finally construct/initialize the planner...
+    // Initialize optimization objective
+    auto opt_obj = std::make_shared<ompl::base::PathLengthOptimizationObjective>(
+        ss.getSpaceInformation());    
+    opt_obj->setCostThreshold(opt_obj->infiniteCost()); // Terminate on first solution    
+    ss.setOptimizationObjective(opt_obj);
 
-    /*
-    auto planner = std::make_unique(smpl::OMPLPlanner(
-            ss.getSpaceInformation(), "arastar.bfs.manip", &grid));
-
-    // Read params from the parameter server...
-    PlannerConfig planning_config;
-    if (!ReadPlannerConfig(ros::NodeHandle("~planning"), planning_config)) {
-        ROS_ERROR("Failed to read planner config");
-        return 1;
+    // Initialize start state
+    std::vector<double> start_joints(start_state.joint_state.position);
+    ompl::base::ScopedState<ompl::base::CompoundStateSpace> start(state_space);
+    for (int i = 0; i < start_joints.size(); ++i) {
+        start[i] = start_joints[i];
     }
+    ss.setStartState(start); 
 
-    // Set all planner params
-    // TODO: handle discretization parameters
-    planner->params().setParam("mprim_filename", planning_config.mprim_filename);
-    planner->params().setParam("use_xyz_snap_mprim", planning_config.use_xyz_snap_mprim ? "1" : "0");
-    planner->params().setParam("use_rpy_snap_mprim", planning_config.use_rpy_snap_mprim ? "1" : "0");
-    planner->params().setParam("use_xyzrpy_snap_mprim", planning_config.use_xyzrpy_snap_mprim ? "1" : "0");
-    planner->params().setParam("use_short_dist_mprims", planning_config.use_short_dist_mprims ? "1" : "0");
-    planner->params().setParam("xyz_snap_dist_thresh", std::to_string(planning_config.xyz_snap_dist_thresh));
-    planner->params().setParam("rpy_snap_dist_thresh", std::to_string(planning_config.rpy_snap_dist_thresh));
-    planner->params().setParam("xyzrpy_snap_dist_thresh", std::to_string(planning_config.xyzrpy_snap_dist_thresh));
-    planner->params().setParam("short_dist_mprims_thresh", std::to_string(planning_config.short_dist_mprims_thresh));
-    planner->params().setParam("epsilon", "100.0");
-    planner->params().setParam("search_mode", "0");
-    planner->params().setParam("allow_partial_solutions", "0");
-    planner->params().setParam("target_epsilon", "1.0");
-    planner->params().setParam("delta_epsilon", "1.0");
-    planner->params().setParam("improve_solution", "0");
-    planner->params().setParam("bound_expansions", "1");
-    planner->params().setParam("repair_time", "1.0");
-    planner->params().setParam("bfs_inflation_radius", "0.04");
-    planner->params().setParam("bfs_cost_per_cell", "100");
+    // Initialize goal state
+    // Note: For goal poses, we need to add a ik projection for ompl goal sampling    
+    moveit_msgs::RobotState goal_state;
+    if (!ReadJointStateGoalConfiguration(ph, goal_state)) {
+        ROS_ERROR("Failed to get initial configuration.");
+        return 1;
+    }    
 
-    planner->setStateVisualizer(
-            [&](const std::vector<double>& state)
-                -> std::vector<smpl::visual::Marker>
-            {
-                return cc.getCollisionModelVisualization(state);
-            });
+    std::vector<double> goal_joints(goal_state.joint_state.position);
+    ompl::base::ScopedState<ompl::base::CompoundStateSpace> goal(state_space);
+    for (int i = 0; i < goal_joints.size(); ++i) {
+        goal[i] = goal_joints[i];
+    }    
 
-    ss.setPlanner(ompl::base::PlannerPtr(planner));
-    */
+    ss.setGoalState(goal);
+
+
+    // Initialize OMPL Planner 
+    ROS_INFO("Planning with %s", cfg.ompl_planner.c_str()); 
+    auto search_mode = ompl::geometric::CriticalPRM::QUERY; 
+    
+    if (cfg.ompl_planner == "prm") {
+        auto prm = new ompl::geometric::CriticalPRM(ss.getSpaceInformation()); 
+        prm->setProblemDefinition(ss.getProblemDefinition()); 
+        prm->growRoadmapFromFile(cfg.roadmap_filename); 
+        prm->setMode(search_mode); 
+        ss.setPlanner(ompl::base::PlannerPtr(prm)); 
+
+        ROS_INFO("Initialized prm with %d vertices, %d edges", 
+            prm->milestoneCount(), prm->edgeCount());         
+
+    } else if (cfg.ompl_planner == "critical_prm") {
+        auto crit_prm = new ompl::geometric::CriticalPRM(ss.getSpaceInformation());         
+        crit_prm->setProblemDefinition(ss.getProblemDefinition());         
+        crit_prm->growRoadmapFromFile(cfg.roadmap_filename);         
+        crit_prm->addCriticalConnections(cfg.crit_states_filename); 
+        crit_prm->setMode(search_mode);         
+        ss.setPlanner(ompl::base::PlannerPtr(crit_prm)); 
+
+        ROS_INFO("Initialized prm with %d vertices, %d edges",     
+            crit_prm->milestoneCount(), crit_prm->edgeCount());
+
+    } else if (cfg.ompl_planner == "rrt_connect") {
+        auto* rrtc = new ompl::geometric::RRTConnect(ss.getSpaceInformation());        
+        ss.setPlanner(ompl::base::PlannerPtr(rrtc));         
+    } else {
+        ROS_ERROR("Unrecognized OMPL planner %s", cfg.ompl_planner.c_str()); 
+        return 0; 
+    }
 
     //////////////
     // Planning //
     //////////////
 
-    ROS_INFO("Setup the query");
-
-
-    // Set the goal state...
-    Eigen::Affine3d goal_pose;
-    {
-        std::vector<double> goal(6, 0);
-        ph.param("goal/x", goal[0], 0.0);
-        ph.param("goal/y", goal[1], 0.0);
-        ph.param("goal/z", goal[2], 0.0);
-        ph.param("goal/yaw", goal[3], 0.0);
-        ph.param("goal/pitch", goal[4], 0.0);
-        ph.param("goal/roll", goal[5], 0.0);
-        goal_pose =
-                Eigen::Translation3d(goal[0], goal[1], goal[2]) *
-                Eigen::AngleAxisd(goal[3], Eigen::Vector3d::UnitZ()) *
-                Eigen::AngleAxisd(goal[4], Eigen::Vector3d::UnitY()) *
-                Eigen::AngleAxisd(goal[5], Eigen::Vector3d::UnitX());
-    }
-    for(int i=0; i<3; ++i)
-        ROS_ERROR("Goal pose %d: %f", i, goal_pose.translation()[i]);
-
-    auto goal_condition = std::make_shared<smpl::PoseGoal>(
-            ss.getSpaceInformation(), goal_pose);
-//    goal_condition->position_tolerance = Eigen::Vector3d(0.015, 0.015, 0.015);
-    goal_condition->position_tolerance = Eigen::Vector3d(0.012, 0.012, 0.012);
-    goal_condition->orientation_tolerance = Eigen::Vector3d(
-            smpl::angles::to_radians(7.0),
-            smpl::angles::to_radians(7.0),
-            smpl::angles::to_radians(7.0));
-    ss.setGoal(ompl::base::GoalPtr(goal_condition));
-
-    //ss.setup();
-    // Set the start state...
-    auto found_valid_start = false;
-    auto max_tries = 1;
-    /*
-    for (int i = 0; i < max_tries; ++i) {
-        ROS_ERROR("Start try %d", i);
-        ompl::base::ScopedState<ompl::base::CompoundStateSpace> start(state_space);
-        start.random();
-        std::cout<<"Start:\n";
-        std::cout<<start<<"\n";
-        std::vector<double> values = start.reals();
-        ROS_ERROR("Copied");
-        ROS_ERROR("Copied size: %d", values.size());
-        //for(auto& val : values)
-            //ROS_ERROR("%d", values[i]);
-        if (ss.getspaceinformation()->spaceinformation::isvalid(start.get())) {
-            ss.setstartstate(start);
-            found_valid_start = true;
-            break;
-        }
-    }
-    */
-    std::vector<double> start_vals(10, 0);
-    start_vals[0] = 5;
-    start_vals[1] = 4;
-    ompl::base::ScopedState<ompl::base::CompoundStateSpace> start(state_space);
-    start = start_vals;
-    //if (ss.getSpaceInformation()->SpaceInformation::isValid(start.get())) {
-        ss.setStartState(start);
-        found_valid_start = true;
-    //}
-
-    if (!found_valid_start) {
-        //ROS_WARN("Failed to find valid start state after %d tries", max_tries);
-    } else{
-        ROS_INFO("Found valid start.");
-    }
-
-    //OMPL Planner
-    //auto pdef = std::make_shared<ompl::base::ProblemDefinition>(ss.getSpaceInformation());
-    //pdef->addStartState(start.get());
-    //pdef->setGoal(goal_condition);
-
-    //ss.setup();
-    // plan
-
-    // XXX
-    // RRT-Connect and BITstar need GoalSampleableRegion.
-    // XXX
-    //ompl::base::PlannerPtr planner(new ompl::geometric::BITstar(ss.getSpaceInformation()));
-    //planner->as<ompl::geometric::SBL>()->setProjectionEvaluator("fk");
-    ompl::base::PlannerPtr planner(new ompl::geometric::RRT(ss.getSpaceInformation()));
-    dynamic_cast<ompl::geometric::RRT*>(planner.get())->setRange(0.1);
-    ss.setPlanner(planner);
-
-    ROS_INFO("Calling solve...");
-    double allowed_planning_time;
-    ph.param("allowed_planning_time", allowed_planning_time, 10.0);
-    auto solved = ss.solve(allowed_planning_time);
-    if (!solved) {
-        ROS_INFO("Failed to plan.");
-        return 0;
-    }
+    auto solved = ss.solve(cfg.allowed_planning_time);
 
     ///////////////////////////////////
     // Visualizations and Statistics //
     ///////////////////////////////////
 
-    // TODO: print statistics
+    if (solved && cfg.use_visualization) {
+        auto found_path = ss.getSolutionPath(); 
+        found_path.interpolate(100);         
+        size_t pidx = 0;
+        while (ros::ok()) { 
+            auto* state = found_path.getState(pidx);           
+            auto point = smpl::MakeStateSMPL(state_space.get(), state);
+            auto markers = cc.getCollisionRobotVisualization(point);
+            for (auto& m : markers.markers) {
+                m.ns = "path_animation";
+            }
+            // Vis solution
+            SV_SHOW_INFO(markers);
 
-    std::cout << "Found solution of length " << ss.getSolutionPath().getStateCount() << "\n";
-//    ss.getSolutionPath().print(std::cout);
+            // Vis scene 
+            SV_SHOW_INFO(cc.getCollisionRobotVisualization());
+            SV_SHOW_INFO(cc.getCollisionWorldVisualization());
+            SV_SHOW_INFO(cc.getOccupiedVoxelsVisualization());            
 
-//    ss.getSolutionPath().interpolate(50);
-    ss.getSolutionPath().interpolate(1000);
-    std::cout << "Interpolated (raw) solution has " << ss.getSolutionPath().getStateCount() << " waypoints\n";
-    ss.simplifySolution();
-    std::cout << "Simplified solution has " << ss.getSolutionPath().getStateCount() << " waypoints\n";
-    ss.getSolutionPath().interpolate(1000);
-    std::cout << "Interpolated (simplified) solution has " << ss.getSolutionPath().getStateCount() << " waypoints\n";
-
-    ROS_INFO("Animate path");
-
-    size_t pidx = 0;
-    while (ros::ok()) {
-        auto* state = ss.getSolutionPath().getState(pidx);
-        auto point = smpl::MakeStateSMPL(state_space.get(), state);
-        //for(int i=0; i<point.size(); i++)
-            //ROS_ERROR("%f", point[i]);
-        auto markers = cc.getCollisionRobotVisualization(point);
-        for (auto& m : markers.markers) {
-            m.ns = "path_animation";
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            pidx++;
+            pidx %= found_path.getStateCount();            
         }
-        SV_SHOW_INFO(markers);
-//        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        pidx++;
-        pidx %= ss.getSolutionPath().getStateCount();
-        if (pidx == 0) break;
     }
 
-    return 0;
+    if (cfg.use_logging) {
+        smpl::Writer w (cfg.log_filename); 
+
+        std::string entry = "-1, -1, -1, -1, -1, -1, -1\n"; // fail case
+        if (solved) {
+            auto time = std::to_string(ss.getLastPlanComputationTime()); 
+            auto expansions = "-1"; // No expansions
+            auto cost_planner = "-1"; // Planning cost is same as planner interface cost (path length)
+            auto cost_pi = std::to_string(ss.getSolutionPath().cost(opt_obj).value()); 
+
+            // Post processing 
+            if (cfg.use_post_processing) {
+                ss.simplifySolution();
+            }            
+            auto time_processed = cfg.use_post_processing ? \
+                std::to_string(ss.getLastSimplificationTime()) : "-1"; 
+            auto cost_processed = cfg.use_post_processing ? \
+                std::to_string(ss.getSolutionPath().cost(opt_obj).value()) : "-1"; 
+            entry = time + ", " + \
+            expansions + ", " + \
+            cost_planner + ", " + \
+            cost_pi + ", " + \
+            time_processed + ", " + \
+            cost_processed + ", " + \
+            cfg.exp_id + "\n"; 
+        }
+
+        w.Write(entry); 
+    }
+
+    return !solved;
 }

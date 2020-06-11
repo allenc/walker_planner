@@ -179,6 +179,7 @@ add_executable( test_ompl_planner
     src/config/collision_space_scene.cpp
     src/config/get_collision_objects.cpp
     src/config/planner_config.cpp
+    ${CRITICAL}    
     ${AUXILIARY})    
 target_link_libraries( test_ompl_planner ${catkin_LIBRARIES} smpl::smpl )
 

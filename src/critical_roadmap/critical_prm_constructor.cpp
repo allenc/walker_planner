@@ -100,7 +100,7 @@ CriticalPRMConstructor::CriticalPRMConstructor(
 	auto mode = ompl::geometric::CriticalPRM::CONSTRUCT;  
 	m_prm_planner->setMode(mode); 
 
-	std::string milestones_filename = m_cfg.save_dir + "/grown_milestones.csv"; 
+	std::string milestones_filename = m_cfg.save_dir + "/load/grown_milestones.csv"; 
 	m_prm_planner->setLoggingParameters(m_cfg.save_roadmap, milestones_filename);  
 }
 

@@ -427,7 +427,7 @@ int main(int argc, char* argv[])
 
 
     // Test loading prm 
-    std::string f_grown_milestones = "/home/allen/catkin_ws/src/walker_planner/critical_roadmaps/test/grown_milestones.csv"; 
+    std::string f_grown_milestones = "/home/allen/catkin_ws/src/walker_planner/critical_roadmaps/test/load/grown_milestones.csv"; 
     auto prm = new ompl::geometric::CriticalPRM(ss.getSpaceInformation()); 
     prm->setProblemDefinition(ss.getProblemDefinition()); 
     prm->growRoadmapFromFile(f_grown_milestones); 
