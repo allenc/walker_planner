@@ -80,6 +80,18 @@ bool ReadInitialConfiguration(
     ros::NodeHandle& nh,
     moveit_msgs::RobotState& state);
 
+bool ReadJointStateGoalConfiguration(
+    ros::NodeHandle& nh,
+    moveit_msgs::RobotState& state);
+
+bool ReadPoseGoal(
+    ros::NodeHandle& nh, 
+    std::vector<double>& goal); 
+
+bool ReadCriticalStateConfigurations(
+    ros::NodeHandle& nh,
+    std::vector<smpl::RobotState>& state); 
+
 bool ReadRobotModelConfig(const ros::NodeHandle &nh, RobotModelConfig &config);
 
 bool ReadPlannerConfig(const ros::NodeHandle &nh, PlannerConfig &config);

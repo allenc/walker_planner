@@ -2,6 +2,10 @@
     <env name="ROSCONSOLE_CONFIG_FILE" value="$(find walker_planner)/config/rosconsole.config" />
 
     <arg name="debug" default="false"/>
+    <arg name="scenario" default="multi_room"/>
+    <arg name="exp" default="0"/>
+    <arg name="logging" default="false"/>
+
     <arg name="rvizconfig" default ="$(find walker_planner)/config/urdf.rviz" />
 
 
@@ -18,12 +22,11 @@
     <!-- <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)"
 required="true" /> -->
 
-
-    <node pkg="walker_planner" type="generate_start_goals" name="generate_start_goals"
+    <node pkg="walker_planner" type="test_smha_planner" name="test_smha_planner"
             launch-prefix="$(arg launch-prefix)" output="screen">
         <param name="planning_frame" value="dummy_base"/>
 
-        <!-- 1. robot model (for planning) -->
+        <!-- robot model (for planning) -->
         <rosparam param="robot_model">
             group_name: full_body
             planning_joints:
@@ -46,27 +49,21 @@ required="true" /> -->
         <!-- collision checking -->
         <rosparam command="load" file="$(find walker_planner)/config/collision_model_walker.yaml"/>
 
-        <rosparam command="load" file="$(find walker_planner)/env/multi_room_map.yaml" />
-
         <!-- planner params -->
-        <rosparam command="load" file="$(find walker_planner)/config/walker_right_arm.yaml"/>
+        <rosparam command="load" file="$(find walker_planner)/config/walker_right_arm.yaml"/>        
         <param name="planning/mprim_filename" value="$(find
         walker_planner)/config/walker_multi_rep.mprim"/>
-
         <param name="allowed_planning_time" value="300.0"/>
-        <!-- <param name="read_goal_from_file" value="true"/> -->
-<!--         <param name="robot_start_states_file" value="$(find walker_planner)/experiments/walker_start_states.txt" />
-        <param name="robot_goal_states_file" value="$(find walker_planner)/experiments/walker_goal_states.txt" /> -->
 
-        <!-- 2. scene -->
-        <!-- 2.1 robot state -->
-        <!-- <rosparam command="load" file="$(find -->
-        <!-- walker_planner)/experiments/walker_goal_mrmha.yaml"/> -->
+        <!-- experiment params -->
+        <param name="logging" value="$(arg logging)"/>        
+        <param name="exp_id" type="string" value="$(arg exp)"/>                        
+        <rosparam command="load" file="$(find
+        walker_planner)/critical_experiments/$(arg scenario)/$(arg scenario)$(arg exp).yaml"/>
 
-        <!-- 2.2 world state -->
-        <!-- <param name="object_filename" value="$(find walker_planner)/env/proj_env.env"/> -->
-
-        <!-- 3. scenario -->
+        <!-- environment params -->
+        <rosparam command="load" file="$(find walker_planner)/env/multi_room_map.yaml" />
+        <param name="object_filename" value="$(find walker_planner)/env/multi_rooms.env"/>
 
     </node>
 </launch>

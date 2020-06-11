@@ -117,6 +117,80 @@ bool ReadInitialConfiguration(
     return true;
 }
 
+bool ReadJointStateGoalConfiguration(
+    ros::NodeHandle& nh, 
+    moveit_msgs::RobotState& state) 
+{
+    XmlRpc::XmlRpcValue xlist; 
+
+    if (nh.hasParam("goal_configuration/joint_state")) {
+        nh.getParam("goal_configuration/joint_state", xlist); 
+
+        if (xlist.getType() != XmlRpc::XmlRpcValue::TypeArray) {
+            ROS_WARN("goal_configuration/joint_state is not an array.");            
+        }
+
+        if (xlist.size() > 0) {
+            for (int i = 0; i < xlist.size(); ++i) {
+                state.joint_state.name.push_back(std::string(xlist[i]["name"])); 
+                if (xlist[i]["position"].getType() == XmlRpc::XmlRpcValue::TypeDouble) { 
+                    state.joint_state.position.push_back(double(xlist[i]["position"]));                    
+                } else {
+                    ROS_DEBUG("Doubles in the yaml file have to contain decimal points"); 
+                    if (xlist[i]["position"].getType() == XmlRpc::XmlRpcValue::TypeInt) {
+                        int pos = xlist[i]["position"]; 
+                        state.joint_state.position.push_back(double(pos)); 
+                    }
+                }
+            }
+
+        }
+    } else {
+        ROS_WARN("goal_configuration/joint_state is not on the param server."); 
+        return false; 
+    }
+    return true; 
+}
+
+bool ReadPoseGoal(ros::NodeHandle& nh, std::vector<double>& goal)
+{
+    nh.param("goal/x", goal[0], 0.0);
+    nh.param("goal/y", goal[1], 0.0);
+    nh.param("goal/z", goal[2], 0.0);
+    nh.param("goal/roll", goal[3], 0.0);
+    nh.param("goal/pitch", goal[4], 0.0);
+    nh.param("goal/yaw", goal[5], 0.0);
+    return true; 
+}
+
+bool ReadCriticalStateConfigurations(
+    ros::NodeHandle& nh, 
+    std::vector<smpl::RobotState>& critical_states)
+{
+    critical_states.clear(); 
+    XmlRpc::XmlRpcValue xlist; 
+    if (nh.hasParam("critical_configurations")) {
+        nh.getParam("critical_configurations", xlist); 
+        if (xlist.getType() != XmlRpc::XmlRpcValue::TypeArray) {
+            ROS_ERROR("additional_roots is not an array.");
+            return false; 
+        } else {
+            ROS_ERROR("Got %zu additional_roots", xlist.size());
+        }
+        for (int i = 0; i < xlist.size(); ++i) {
+            smpl::RobotState rs; 
+            for (int j = 0; j < xlist[i].size(); ++j) {
+                rs.push_back(double(xlist[i][j])); 
+            }
+            critical_states.push_back(rs); 
+        }
+    } else {
+        ROS_ERROR("additional_roots is not on the param server"); 
+        return false; 
+    }
+    return true;     
+}
+
 bool ReadRobotModelConfig(const ros::NodeHandle &nh, RobotModelConfig &config)
 {
     if (!nh.getParam("group_name", config.group_name)) {

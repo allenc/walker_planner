@@ -14,7 +14,6 @@
 #include <smpl/graph/motion_primitive.h>
 #include <smpl/heuristic/robot_heuristic.h>
 #include <smpl/console/console.h>
-//#include <sbpl/planners/types.h>
 
 namespace MPlanner {
 

@@ -137,42 +137,42 @@ target_link_libraries(collision_model_visualizer ${catkin_LIBRARIES} smpl::smpl)
 #add_dependencies( test_mrmha_rr_planner ${${PROJECT_NAME}_EXPORTED_TARGETS}
 #    ${catkin_EXPORTED_TARGETS} )
 
-add_executable( mrmhaplanner
-    src/mha/mrmhaplanner.cpp
-    src/motion_planner_ros.cpp
-    src/config/planner_config.cpp
-    src/config/collision_space_scene.cpp
-    src/config/get_collision_objects.cpp
-    )
-target_link_libraries( mrmhaplanner ${catkin_LIBRARIES} smpl::smpl )
+# add_executable( mrmhaplanner
+#     src/mha/mrmhaplanner.cpp
+#     src/motion_planner_ros.cpp
+#     src/config/planner_config.cpp
+#     src/config/collision_space_scene.cpp
+#     src/config/get_collision_objects.cpp
+#     )
+# target_link_libraries( mrmhaplanner ${catkin_LIBRARIES} smpl::smpl )
 
-add_executable( walker_planner
-    src/mha/walker_planner.cpp
-    src/motion_planner_ros.cpp
-    src/config/collision_space_scene.cpp
-    src/config/planner_config.cpp
-    src/config/get_collision_objects.cpp)
-target_link_libraries(walker_planner ${catkin_LIBRARIES} smpl::smpl ${orocos_kdl_LIBRARIES})
-add_dependencies( walker_planner ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} )
+# add_executable( walker_planner
+#     src/mha/walker_planner.cpp
+#     src/motion_planner_ros.cpp
+#     src/config/collision_space_scene.cpp
+#     src/config/planner_config.cpp
+#     src/config/get_collision_objects.cpp)
+# target_link_libraries(walker_planner ${catkin_LIBRARIES} smpl::smpl ${orocos_kdl_LIBRARIES})
+# add_dependencies( walker_planner ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} )
 
-add_executable( test_mha_planner
-    src/mha/test_mha_planner.cpp
-    src/motion_planner_ros.cpp
-    src/config/collision_space_scene.cpp
-    src/config/planner_config.cpp
-    src/config/get_collision_objects.cpp)
-target_link_libraries(test_mha_planner ${catkin_LIBRARIES} smpl::smpl ${orocos_kdl_LIBRARIES})
-add_dependencies( test_mha_planner ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} )
+# add_executable( test_mha_planner
+#     src/mha/test_mha_planner.cpp
+#     src/motion_planner_ros.cpp
+#     src/config/collision_space_scene.cpp
+#     src/config/planner_config.cpp
+#     src/config/get_collision_objects.cpp)
+# target_link_libraries(test_mha_planner ${catkin_LIBRARIES} smpl::smpl ${orocos_kdl_LIBRARIES})
+# add_dependencies( test_mha_planner ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} )
 
-add_executable( test_rmha_planner
-    src/mha/test_rmha_planner.cpp
-    src/motion_planner_ros.cpp
-    src/config/collision_space_scene.cpp
-    src/config/planner_config.cpp
-    src/config/get_collision_objects.cpp
-    ${PLANNERS})
-target_link_libraries(test_rmha_planner ${catkin_LIBRARIES} smpl::smpl ${orocos_kdl_LIBRARIES})
-add_dependencies( test_rmha_planner ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} )
+# add_executable( test_rmha_planner
+#     src/mha/test_rmha_planner.cpp
+#     src/motion_planner_ros.cpp
+#     src/config/collision_space_scene.cpp
+#     src/config/planner_config.cpp
+#     src/config/get_collision_objects.cpp
+    # ${PLANNERS})
+# target_link_libraries(test_rmha_planner ${catkin_LIBRARIES} smpl::smpl ${orocos_kdl_LIBRARIES})
+# add_dependencies( test_rmha_planner ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} )
 
 add_executable( test_ompl_planner
     src/test_ompl_planner.cpp
@@ -234,13 +234,13 @@ add_executable(generate_start_goals
     ${AUXILIARY})
 target_link_libraries(generate_start_goals ${catkin_LIBRARIES} smpl::smpl)
 
-add_executable( test_ik
-    test/test_ik.cpp
-    src/config/collision_space_scene.cpp
-    src/config/planner_config.cpp
-    src/config/get_collision_objects.cpp)
-target_link_libraries(test_ik ${catkin_LIBRARIES} smpl::smpl ${orocos_kdl_LIBRARIES})
-add_dependencies( test_ik ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} )
+# add_executable( test_ik
+#     test/test_ik.cpp
+#     src/config/collision_space_scene.cpp
+#     src/config/planner_config.cpp
+#     src/config/get_collision_objects.cpp)
+# target_link_libraries(test_ik ${catkin_LIBRARIES} smpl::smpl ${orocos_kdl_LIBRARIES})
+# add_dependencies( test_ik ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} )
 
 #add_executable( test_templated_mrmha_planner
 #    test/test_mrmhaplanner.cpp
@@ -251,22 +251,22 @@ add_dependencies( test_ik ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_
 #    )
 #target_link_libraries( test_templated_mrmha_planner ${catkin_LIBRARIES} smpl::smpl )
 
-add_executable( test_start_goal_generator
-    test/test_start_goal_generator.cpp src/utils/start_goal_generator.cpp)
-target_link_libraries(test_start_goal_generator ${catkin_LIBRARIES} smpl::smpl)
+# add_executable( test_start_goal_generator
+#     test/test_start_goal_generator.cpp src/utils/start_goal_generator.cpp)
+# target_link_libraries(test_start_goal_generator ${catkin_LIBRARIES} smpl::smpl)
 
-add_executable( test_fk
-    test/test_fk.cpp
-    src/config/planner_config.cpp
-    src/config/collision_space_scene.cpp
-    src/motion_planner_ros.cpp
-    src/config/get_collision_objects.cpp)
-target_link_libraries(test_fk ${catkin_LIBRARIES} smpl::smpl)
+# add_executable( test_fk
+#     test/test_fk.cpp
+#     src/config/planner_config.cpp
+#     src/config/collision_space_scene.cpp
+#     src/motion_planner_ros.cpp
+#     src/config/get_collision_objects.cpp)
+# target_link_libraries(test_fk ${catkin_LIBRARIES} smpl::smpl)
 
-add_executable( debug_planner
-    src/debug/debug_planner.cpp
-    src/config/planner_config.cpp
-    src/config/collision_space_scene.cpp
-    src/motion_planner_ros.cpp
-    src/config/get_collision_objects.cpp)
-target_link_libraries(debug_planner ${catkin_LIBRARIES} smpl::smpl)
+# add_executable( debug_planner
+#     src/debug/debug_planner.cpp
+#     src/config/planner_config.cpp
+#     src/config/collision_space_scene.cpp
+#     src/motion_planner_ros.cpp
+#     src/config/get_collision_objects.cpp)
+# target_link_libraries(debug_planner ${catkin_LIBRARIES} smpl::smpl)

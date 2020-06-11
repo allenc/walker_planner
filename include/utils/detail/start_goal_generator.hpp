@@ -7,6 +7,8 @@
 #include <smpl/debug/visualize.h>
 #include <smpl/debug/marker_utils.h>
 
+#include <smpl/utils/debugging_utils.h>
+
 #include "config/planner_config.h"
 #include "utils/utils.h"
 #include "../start_goal_generator.h"
@@ -53,6 +55,10 @@ bool StartGoalGenerator<RM>::generate(int _n){
 
             if(m_cc->isStateValid(rand_start)){
                 m_start_states.push_back(rand_start);
+                auto markers = m_cc->getCollisionRobotVisualization(rand_start);
+                for(auto& marker : markers.markers)
+                    marker.ns = "start_state";
+                SV_SHOW_INFO(markers);                
                 found = true;
             } else
                 ROS_ERROR("Start in collision");
@@ -122,9 +128,6 @@ bool StartGoalGenerator<RM>::generate(int _n){
                             possible_state[j] = rand_start_state[j];
 
                         auto markers = m_cc->getCollisionRobotVisualization(possible_state);
-                        for(auto& marker : markers.markers)
-                            marker.ns = "temp_state";
-                        SV_SHOW_INFO(markers);
                         //ros::Duration(1.0).sleep();
 
                         auto end_eff_pose = m_rm->computeFK(possible_state);
@@ -132,6 +135,13 @@ bool StartGoalGenerator<RM>::generate(int _n){
                         if(m_goal_region.isValid(pose_xyzrpy) && m_cc->isStateValid(possible_state)){
                             ROS_ERROR("Found a valid goal robot state");
                             //ros::Duration(1.0).sleep();
+
+                            for(auto& marker : markers.markers)
+                                marker.ns = "goal_state";
+                            SV_SHOW_INFO(markers);
+                            
+
+                            PrintSMPLState(possible_state);                             
                             m_goal_states.push_back(possible_state);
                             m_goal_poses.push_back(pose_xyzrpy);
                             found_goal_state = true;
@@ -170,7 +180,7 @@ bool StartGoalGenerator<RM>::writeToFile(std::string _start_header,
             ROS_ERROR("Could not open start file.");
             return false;
         }
-        start_stream << _start_header;
+        // start_stream << _start_header;
         for(auto& state : m_start_states){
             for(auto& val : state){
                 start_stream << val <<" ";

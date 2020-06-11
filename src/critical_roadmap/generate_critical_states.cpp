@@ -420,8 +420,22 @@ int main(int argc, char* argv[])
     cfg.save_dir = "/home/allen/catkin_ws/src/walker_planner/critical_roadmaps/test"; 
 
     ss.setup(); 
-    auto crit_ctor = smpl::CriticalPRMConstructor(ss, cfg);
-    crit_ctor.constructCriticalPRM(); 
+
+    // Construct Critical PRM 
+    // auto crit_ctor = smpl::CriticalPRMConstructor(ss, cfg);
+    // crit_ctor.constructCriticalPRM(); 
+
+
+    // Test loading prm 
+    std::string f_grown_milestones = "/home/allen/catkin_ws/src/walker_planner/critical_roadmaps/test/grown_milestones.csv"; 
+    auto prm = new ompl::geometric::CriticalPRM(ss.getSpaceInformation()); 
+    prm->setProblemDefinition(ss.getProblemDefinition()); 
+    prm->growRoadmapFromFile(f_grown_milestones); 
+        ROS_ERROR("Initialized prm with %d vertices, %d edges", 
+            prm->milestoneCount(), prm->edgeCount());     
+
+    return 0; 
+
 
     // Vis 
     ROS_INFO("Visualizing scene"); 

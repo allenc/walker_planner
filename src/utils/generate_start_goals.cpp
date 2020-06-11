@@ -388,8 +388,8 @@ int main(int argc, char** argv){
         ROS_ERROR("Could not generate start-goal pairs.");
     generator.writeToFile(
             "x y theta right_j1 right_j2 right_j3 right_j4 right_j5 right_j6 right_j7\n",
-            "/home/allen/catkin_ws/src/walker_planner/experiments/start_states.txt", 
-            "/home/allen/catkin_ws/src/walker_planner/experiments/goal_states.txt",  
-            "/home/allen/catkin_ws/src/walker_planner/experiments/goal_poses.txt"); 
+            "/home/allen/catkin_ws/src/walker_planner/critical_experiments/generated_raw_solutions/start_states.txt", 
+            "/home/allen/catkin_ws/src/walker_planner/critical_experiments/generated_raw_experiments/goal_states.txt",  
+            "/home/allen/catkin_ws/src/walker_planner/critical_experiments/generated_raw_experiments/goal_poses.txt"); 
 }
 
