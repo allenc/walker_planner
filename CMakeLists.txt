@@ -174,6 +174,24 @@ target_link_libraries(collision_model_visualizer ${catkin_LIBRARIES} smpl::smpl)
 # target_link_libraries(test_rmha_planner ${catkin_LIBRARIES} smpl::smpl ${orocos_kdl_LIBRARIES})
 # add_dependencies( test_rmha_planner ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} )
 
+add_executable( test_miastar_planner
+    src/test_miastar_planner.cpp
+    src/config/collision_space_scene.cpp
+    src/config/get_collision_objects.cpp
+    src/config/planner_config.cpp
+    ${CRITICAL}    
+    ${AUXILIARY})    
+target_link_libraries( test_miastar_planner ${catkin_LIBRARIES} smpl::smpl )
+
+add_executable( test_smha_planner
+    src/test_smha_planner.cpp
+    src/config/collision_space_scene.cpp
+    src/config/get_collision_objects.cpp
+    src/config/planner_config.cpp
+    ${CRITICAL}    
+    ${AUXILIARY})    
+target_link_libraries( test_smha_planner ${catkin_LIBRARIES} smpl::smpl )
+
 add_executable( test_ompl_planner
     src/test_ompl_planner.cpp
     src/config/collision_space_scene.cpp

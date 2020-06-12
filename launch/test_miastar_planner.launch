@@ -31,7 +31,7 @@
 
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" required="true" />
 
-    <node pkg="walker_planner" type="test_smha_planner" name="test_smha_planner"
+    <node pkg="walker_planner" type="test_miastar_planner" name="test_miastar_planner"
             launch-prefix="$(arg launch-prefix)" output="screen">
         <param name="planning_frame" value="dummy_base"/>
 

@@ -72,9 +72,9 @@ struct MultiRoomMapConfig {
 void FillGoalConstraint(
     const std::vector<double>& pose,
     std::string frame_id,
-    moveit_msgs::Constraints& goals,
-    double xyz_tol,
-    double rpy_tol);
+    moveit_msgs::Constraints& goals, 
+    double xyz_tol=0.02, 
+    double rpy_tol=0.05); 
 
 bool ReadInitialConfiguration(
     ros::NodeHandle& nh,

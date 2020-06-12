@@ -57,7 +57,7 @@ required="true" /> -->
         </rosparam>
 
         <!-- collision checking -->
-        <rosparam command="load" file="$(find walker_planner)/config/collision_model_walker.yaml"/>
+        <rosparam command="load" file="$(find walker_planner)/config/collision_model_walker.yaml"/>        
 
         <!-- planner params -->
         <param name="ompl_planner" value="$(arg ompl_planner)"/>

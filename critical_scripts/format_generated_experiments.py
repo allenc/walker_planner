@@ -88,5 +88,5 @@ if __name__ == "__main__":
 	# gen exp files
 	exp_label = "multi_room"
 	exp_dst_dir = join("../critical_experiments/", exp_label)
-	e.generate_formatted_experiments(exp_dst_dir, exp_label, topk_crit=50)
+	e.generate_formatted_experiments(exp_dst_dir, exp_label, topk_crit=3)
 

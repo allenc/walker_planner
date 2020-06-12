@@ -30,6 +30,8 @@
 #include <smpl_ompl_interface/ompl_interface.h>
 #include <urdf_parser/urdf_parser.h>
 
+#include <smpl/utils/debugging_utils.h>
+
 #include "critical_roadmap/critical_prm.h"
 #include "critical_roadmap/critical_prm_constructor.h"
 #include "config/planner_config.h"

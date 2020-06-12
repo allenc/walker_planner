@@ -232,9 +232,9 @@ bool ReadPlannerConfig(const ros::NodeHandle &nh, PlannerConfig &config)
         return false;
     }
 
-    if (!nh.getParam("mprim_filenames", config.mprim_filenames)) {
-        ROS_ERROR("Failed to read param 'mprim_filenames' from the param server");
-    }
+    // if (!nh.getParam("mprim_filenames", config.mprim_filenames)) {
+    //     ROS_ERROR("Failed to read param 'mprim_filenames' from the param server");
+    // }
 
     if (!nh.getParam("use_xyz_snap_mprim", config.use_xyz_snap_mprim)) {
         ROS_ERROR("Failed to read param 'use_xyz_snap_mprim' from the param server");
