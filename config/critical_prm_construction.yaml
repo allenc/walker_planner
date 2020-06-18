@@ -1,0 +1,9 @@
+critical_config: 
+  grow_time: 120.0
+  expand_time: 120.0
+  num_sampled_starts: 50
+  num_sampled_goals_per_start: 2000
+  roadmap_label: test_10k
+
+
+  # roadma_label: test_new

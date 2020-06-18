@@ -232,10 +232,6 @@ bool ReadPlannerConfig(const ros::NodeHandle &nh, PlannerConfig &config)
         return false;
     }
 
-    // if (!nh.getParam("mprim_filenames", config.mprim_filenames)) {
-    //     ROS_ERROR("Failed to read param 'mprim_filenames' from the param server");
-    // }
-
     if (!nh.getParam("use_xyz_snap_mprim", config.use_xyz_snap_mprim)) {
         ROS_ERROR("Failed to read param 'use_xyz_snap_mprim' from the param server");
         return false;
@@ -290,12 +286,17 @@ bool ReadPlannerConfig(const ros::NodeHandle &nh, PlannerConfig &config)
         return false;
     }
 
-    if(!nh.getParam("eps", config.eps)){
+    if (!nh.getParam("planner_id", config.planner_id)) {
+        ROS_ERROR("Failed to read param 'planner_id' from the param server");
+        return false;
+    }                
+
+    if(!nh.getParam("epsilon_anchor", config.epsilon_anchor)){
         ROS_ERROR("Failed to read param 'eps' from the param server");
         return false;
     }
 
-    if(!nh.getParam("eps_mha", config.eps_mha)){
+    if(!nh.getParam("epsilon_mha", config.epsilon_mha)){
         ROS_ERROR("Failed to read param 'eps_mha' from the param server");
         return false;
     }
@@ -303,20 +304,26 @@ bool ReadPlannerConfig(const ros::NodeHandle &nh, PlannerConfig &config)
         ROS_ERROR("Failed to read param 'planning_time' from the param server");
         return false;
     }
-    if(!nh.getParam("start_planning_episode", config.start_planning_episode)){
-        ROS_ERROR("Failed to read param 'start_planning_episode' from the param server");
+
+    if (!nh.getParam("animate", config.use_visualization)) {
+        ROS_ERROR("Failed to read param 'animate' from the param server");
         return false;
-    }
-    if(!nh.getParam("end_planning_episode", config.end_planning_episode)){
-        ROS_ERROR("Failed to read param 'end_planning_episode' from the param server");
+    }    
+
+    if (!nh.getParam("logging", config.use_logging)) {
+        ROS_ERROR("Failed to read param 'logging' from the param server");
         return false;
+    }        
+
+    if (config.use_logging) {
+        if (!nh.getParam("log_filename", config.log_filename)) {
+            ROS_ERROR("Failed to read param 'log_filename' from the param server");
+            return false;
+        }                
     }
-    if(!nh.getParam("seed", config.seed)){
-        ROS_ERROR("Failed to read param 'seed' from the param server");
-        return false;
-    }
-    if(!nh.getParam("seeds", config.seeds)){
-        ROS_ERROR("Failed to read param 'seeds' from the param server");
+
+    if(!nh.getParam("post_processing", config.use_post_processing)){
+        ROS_ERROR("Failed to read param 'post_processing' from the param server");
         return false;
     }
 

@@ -8,32 +8,27 @@
 #include <algorithm>
 
 // system includes
-#include <eigen_conversions/eigen_msg.h>
+#include <ros/ros.h>
+#include <urdf_parser/urdf_parser.h>
 #include <kdl_conversions/kdl_msg.h>
+#include <eigen_conversions/eigen_msg.h>
 #include <leatherman/print.h>
 #include <leatherman/utils.h>
-#include <ompl/base/StateSpace.h>
-#include <ompl/base/spaces/RealVectorStateSpace.h>
-#include <ompl/base/spaces/SE2StateSpace.h>
-#include <ompl/base/spaces/SE3StateSpace.h>
-#include <ompl/base/spaces/SO2StateSpace.h>
-#include <ompl/geometric/SimpleSetup.h>
-#include <ompl/geometric/planners/sbl/SBL.h>
-#include <ompl/geometric/planners/rrt/RRT.h>
-#include <ompl/geometric/planners/rrt/RRTConnect.h>
-#include <ompl/geometric/planners/bitstar/BITstar.h>
-#include <ros/ros.h>
-#include <sbpl_collision_checking/collision_space.h>
-#include <sbpl_kdl_robot_model/kdl_robot_model.h>
-#include <smpl/angles.h>
-#include <smpl/debug/visualizer_ros.h>
-#include <smpl/debug/marker_conversions.h> 
-#include <smpl/distance_map/euclid_distance_map.h>
-#include <smpl/planning_params.h>
-#include <smpl_ompl_interface/ompl_interface.h>
-#include <urdf_parser/urdf_parser.h>
 
+// #include <ompl/base/StateSpace.h>
+#include <ompl/base/PlannerData.h>
+#include <ompl/base/PlannerDataStorage.h> 
+#include <ompl/geometric/SimpleSetup.h>
+#include <sbpl_collision_checking/collision_space.h>
+
+// #include <smpl/planning_params.h>
+#include <smpl/debug/marker_conversions.h>
+#include <smpl/debug/visualizer_ros.h>
+#include <smpl/distance_map/euclid_distance_map.h>
+
+// project includes
 #include "critical_roadmap/critical_prm.h"
+#include "critical_roadmap/critical_common.h"
 #include "critical_roadmap/critical_prm_constructor.h"
 #include "config/planner_config.h"
 #include "config/collision_space_scene.h"
@@ -130,7 +125,8 @@ auto MakeSimpleTopKCriticalPathVisualization(
     const std::vector<double>& opacity,     
     const std::string& frame_id,
     const std::string& ns_crit, 
-    const std::string& ns_noncrit)
+    const std::string& ns_noncrit, 
+    bool individual_labels=false)
     -> std::pair< std::vector<smpl::visual::Marker>, std::vector<smpl::visual::Marker> >
 {
     std::vector<smpl::visual::Marker> ma_crit;
@@ -143,6 +139,10 @@ auto MakeSimpleTopKCriticalPathVisualization(
             // Critical state case
             auto markers = cc->getCollisionModelVisualization(path[i]); 
             for (auto& m : markers) {            
+
+                auto ns_crit_labeled = ns_crit + std::to_string(i);                    
+                m.ns = (individual_labels) ? ns_crit_labeled : ns_crit; 
+
                 m.color = smpl::visual::Color{ rgb_crit[0], rgb_crit[1], 
                     rgb_crit[2], 1.0 };
                 ma_crit.push_back(std::move(m)); 
@@ -162,7 +162,6 @@ auto MakeSimpleTopKCriticalPathVisualization(
 
     for (size_t i = 0; i < ma_crit.size(); ++i) {
         auto& marker = ma_crit[i];
-        marker.ns = ns_crit; 
         marker.id = i;
     }
 
@@ -400,9 +399,19 @@ int main(int argc, char* argv[])
     // Visualizations  //
     /////////////////////
 
-    // To Do: Move these to rosparams
-    std::string f_vertices = "/home/allen/catkin_ws/src/walker_planner/critical_roadmaps/test/crit_roadmap_vertices.csv"; 
-    std::string f_scores = "/home/allen/catkin_ws/src/walker_planner/critical_roadmaps/test/crit_roadmap_scores.csv"; 
+    smpl::ConstructionConfig cfg; 
+    if (!ReadCriticalConstructionConfig(ros::NodeHandle("~critical_config"), cfg)) {
+        ROS_ERROR("Failed to read construction parameters"); 
+    }    
+
+    std::string f_vertices = cfg.roadmap_dir + "/critical_vertices.csv"; 
+    std::string f_scores = cfg.roadmap_dir + "/critical_scores.csv";  
+    
+    ROS_INFO("Critical Vertices filename: %s", f_vertices.c_str());    
+    ROS_INFO("Critical Scores filename: %s", f_scores.c_str());        
+
+    // std::string f_vertices = "/home/allen/catkin_ws/src/walker_planner/critical_roadmaps/test/crit_roadmap_vertices.csv"; 
+    // std::string f_scores = "/home/allen/catkin_ws/src/walker_planner/critical_roadmaps/test/crit_roadmap_scores.csv"; 
 
     std::vector<smpl::RobotState> crit_states; 
     ReadPR2RobotStatesFromFile(f_vertices, crit_states);     
@@ -433,7 +442,7 @@ int main(int argc, char* argv[])
 
     auto crit_markers = MakeSimpleTopKCriticalPathVisualization(&cc, top_k, 
         crit_states, rgb_crit, rgb_noncrit, crit_scores_norm, planning_frame, 
-        ns_crit, ns_noncrit); 
+        ns_crit, ns_noncrit, true); 
 
     while (ros::ok()) {
 

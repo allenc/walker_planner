@@ -1,0 +1,39 @@
+planning:
+  discretization:
+    x    0.05
+    y    0.05
+    theta 0.392699082
+    right_j1    0.087267 
+    right_j2    0.087267
+    right_j3    0.087267
+    right_j4    0.087267
+    right_j5    0.087267
+    right_j6    0.087267
+    right_j7    0.087267
+  use_xyz_snap_mprim: true
+  use_rpy_snap_mprim: true
+  use_xyzrpy_snap_mprim: true
+  use_short_dist_mprims: true
+  xyz_snap_dist_thresh: 0.5
+  rpy_snap_dist_thresh: .05
+  xyzrpy_snap_dist_thresh: 0.05
+  short_dist_mprims_thresh: 0.1
+  cost_per_cell: 500
+  inflation_radius_2d: 0.285
+  inflation_radius_3d: 0.02
+
+  # allen stuff below
+  # TODO: this doesn't matter rn since we're forcing it in crit_planner_interface
+  planner_id: miastar.wee.woo
+  epsilon_anchor: 10.0
+  epsilon_mha: 2.0
+  planning_time: 300.0
+  animate: true
+  logging: false 
+  log_filename: "" 
+  post_processing: false
+
+
+
+# use this for testing:
+# roslaunch test_miastar_planner.launch animate:=true logging:=false exp:=0 --screen

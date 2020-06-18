@@ -3,19 +3,10 @@
 
     <arg name="debug" default="false"/>
 
-    <arg name="ompl_planner" default="prm"/>    
-    <arg name="roadmap_filename" default="$(find walker_planner)/critical_roadmaps/test/load/grown_milestones.csv"/>
-    <arg name="crit_states_filename" default="$(find walker_planner)/critical_roadmaps/test/load/crit_milestones.csv"/>
-    <arg name="plan_time" default="60.0"/>
-
     <arg name="scenario" default="multi_room"/>
     <arg name="exp" default="0"/>
 
-
-    <arg name="post_process" default="true"/>        
-    <arg name="animate" default="false"/>
-    <arg name="logging" default="false"/>
-    <arg name="log_filename" default="$(find walker_planner)/critical_results/$(arg scenario)/test.csv"/>
+    <!-- <arg name="log_filename" default="$(find walker_planner)/critical_results/$(arg scenario)/test.csv"/> -->
 
 
     <arg name="rvizconfig" default ="$(find walker_planner)/config/default_walker_cfg.rviz" />        
@@ -60,17 +51,11 @@ required="true" /> -->
         <rosparam command="load" file="$(find walker_planner)/config/collision_model_walker.yaml"/>        
 
         <!-- planner params -->
-        <param name="ompl_planner" value="$(arg ompl_planner)"/>
-        <param name="roadmap_filename" value="$(arg roadmap_filename)"/>
-        <param name="crit_states_filename" value="$(arg crit_states_filename)"/>
-        <param name="allowed_planning_time" value="$(arg plan_time)"/>        
-        <param name="exp_id" type="string" value="$(arg exp)"/>
+        <rosparam command="load" file="$(find walker_planner)/config/walker_ompl.yaml"/>
+        <param name="planning/roadmap_dir" value="$(find walker_planner)/critical_roadmaps/"/>
+        <param name="planning/exp_id" value="$(arg exp)"/>
 
-
-        <param name="use_post_processing" value="$(arg post_process)"/>                
-        <param name="use_visualization" value="$(arg animate)"/>
-        <param name="use_logging" value="$(arg logging)"/>
-        <param name="log_filename" value="$(arg log_filename)"/>
+        <!-- <param name="log_filename" value="$(arg log_filename)"/> -->
 
         <!-- environment params -->
         <rosparam command="load" file="$(find walker_planner)/env/$(arg scenario)_map.yaml"/>          

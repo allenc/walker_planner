@@ -44,34 +44,13 @@ required="true" /> -->
         <!-- collision checking -->
         <rosparam command="load" file="$(find walker_planner)/config/collision_model_walker.yaml"/>
 
-        <rosparam command="load" file="$(find walker_planner)/env/multi_room_map.yaml" />
-
-        <!-- planner params -->
-        <rosparam command="load" file="$(find walker_planner)/config/walker_right_arm.yaml"/>
-        <param name="planning/mprim_filename" value="$(find
-        walker_planner)/config/walker_multi_rep.mprim"/>
-
         <!-- critical roadmap construction params -->
-<!--         <param name = "using_star_strategy" value ="false"/>        
-        <param name = "roadmap_grow_time" value ="10.0"/>
-        <param name = "roadmap_expand_time" value ="10.0"/>
-        <param name = "save_dir" value ="$(find walker_planner)/critical_roadmaps/test/"/> -->
-
-        <!-- <param name="allowed_planning_time" value="300.0"/> -->
-<!--         <param name="read_goal_from_file" value="true"/>
-        <param name="robot_start_states_file" value="$(find walker_planner)/experiments/walker_start_states.txt" />
-        <param name="robot_goal_states_file" value="$(find walker_planner)/experiments/walker_goal_states.txt" /> -->
-
-        <!-- 2. scene -->
-        <!-- 2.1 robot state -->
-<!--         <rosparam command="load" file="$(find
-        walker_planner)/experiments/walker_goal_mrmha.yaml"/> -->
+        <rosparam command="load" file="$(find walker_planner)/config/critical_prm_construction.yaml"/>
+        
+        <param name="critical_config/roadmap_dir" value="$(find walker_planner)/critical_roadmaps/"/>
 
         <!-- 2.2 world state -->
         <rosparam command="load" file="$(find walker_planner)/env/multi_room_map.yaml" />
-        <param name="object_filename" value="$(find walker_planner)/env/multi_rooms.env"/>
-        
-        <!-- 3. scenario -->
 
     </node>
 </launch>

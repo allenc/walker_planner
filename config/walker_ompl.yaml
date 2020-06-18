@@ -1,0 +1,9 @@
+planning: 
+  planner_id: prm
+  roadmap_label: test_new
+  planning_time: 300.0
+
+  animate: true
+  logging: false
+  log_filename: ""
+  post_processing: false 

@@ -7,225 +7,154 @@
 #include <algorithm>
 
 // system includes
-#include <eigen_conversions/eigen_msg.h>
+#include <ros/ros.h>
+#include <urdf_parser/urdf_parser.h>
 #include <kdl_conversions/kdl_msg.h>
-#include <leatherman/print.h>
-#include <leatherman/utils.h>
-#include <ompl/base/StateSpace.h>
-#include <ompl/base/spaces/RealVectorStateSpace.h>
-#include <ompl/base/spaces/SE2StateSpace.h>
-#include <ompl/base/spaces/SE3StateSpace.h>
-#include <ompl/base/spaces/SO2StateSpace.h>
-#include <ompl/geometric/SimpleSetup.h>
+#include <eigen_conversions/eigen_msg.h>
+
+#include <ompl/base/PlannerData.h>
+#include <ompl/base/PlannerDataStorage.h> 
 #include <ompl/geometric/planners/prm/PRM.h>
 #include <ompl/geometric/planners/rrt/RRTConnect.h>
 #include <ompl/base/objectives/PathLengthOptimizationObjective.h>
-#include <ros/ros.h>
+
 #include <sbpl_collision_checking/collision_space.h>
 #include <sbpl_kdl_robot_model/kdl_robot_model.h>
-#include <smpl/angles.h>
+
 #include <smpl/debug/visualizer_ros.h>
-#include <smpl/distance_map/euclid_distance_map.h>
-#include <smpl/planning_params.h>
-#include <smpl_ompl_interface/ompl_interface.h>
-#include <urdf_parser/urdf_parser.h>
-
 #include <smpl/utils/debugging_utils.h>
+#include <smpl/distance_map/euclid_distance_map.h>
+#include <smpl_ompl_interface/ompl_interface.h>
 
+// project includes
+#include "critical_roadmap/critical_common.h"
 #include "critical_roadmap/critical_prm.h"
 #include "critical_roadmap/critical_prm_constructor.h"
 #include "config/planner_config.h"
 #include "config/collision_space_scene.h"
 #include "config/get_collision_objects.h"
 
-auto ConstructStateSpace(
-    const urdf::ModelInterface& urdf,
-    const std::vector<std::string>& planning_joints)
-    -> ompl::base::StateSpacePtr
+// struct ExperimentConfig 
+// {
+//     // plan params
+//     std::string ompl_planner;     
+//     std::string roadmap_filename;
+//     std::string crit_states_filename;
+//     double allowed_planning_time;     
+//     std::string exp_id;     
+
+//     // plan res params
+//     bool use_post_processing;     
+//     bool use_visualization; 
+//     bool use_logging;    
+//     std::string log_filename;         
+// }; 
+
+// static 
+// void ReadExperimentConfig(const ros::NodeHandle& nh, ExperimentConfig& cfg)
+// {
+//     nh.param<std::string>("ompl_planner", cfg.ompl_planner, "prm"); 
+//     nh.param<std::string>("roadmap_filename", cfg.roadmap_filename, "");
+//     nh.param<std::string>("crit_states_filename", cfg.crit_states_filename, "");
+//     nh.param<double>("allowed_planning_time", cfg.allowed_planning_time, 60.0);
+//     nh.param<std::string>("exp_id", cfg.exp_id, "0"); 
+//     nh.param<bool>("use_post_processing", cfg.use_post_processing, true); 
+//     nh.param<bool>("use_visualization", cfg.use_visualization, false);     
+//     nh.param<bool>("use_logging", cfg.use_logging, false);     
+
+//     if (cfg.use_logging) {
+//         nh.param<std::string>("log_filename", cfg.log_filename, ""); 
+//     }
+// }
+
+struct OMPLExperimentConfig 
 {
-    auto* concrete_space = new ompl::base::CompoundStateSpace;
+    std::string planner_id;
+    std::string roadmap_dir; 
+    double planning_time; 
 
-    for (auto& joint_name : planning_joints) {
-        auto joint = urdf.getJoint(joint_name);
-        switch (joint->type) {
-        case urdf::Joint::UNKNOWN:
-            return NULL;
-        case urdf::Joint::FIXED:
-            break;
-        case urdf::Joint::PRISMATIC:
-        case urdf::Joint::REVOLUTE:
-        {
-            auto* subspace = new ompl::base::RealVectorStateSpace(1);
-            if (joint->safety) {
-                subspace->setBounds(joint->safety->soft_lower_limit, joint->safety->soft_upper_limit);
-            } else if (joint->limits) {
-                if(joint_name == "x" )
-                    subspace->setBounds(0, 20);
-                else if(joint_name == "y")
-                    subspace->setBounds(0, 15);
-                else
-                subspace->setBounds(joint->limits->lower, std::min(joint->limits->upper, 20.0));
-            } else {
-                subspace->setBounds(-1.0, 1.0);
-            }
+    std::string exp_id; 
 
-            ompl::base::StateSpacePtr subspace_ptr(subspace);
-            concrete_space->addSubspace(subspace_ptr, 1.0);
-            break;
-        }
-        case urdf::Joint::CONTINUOUS:
-        {
-            concrete_space->addSubspace(
-                    ompl::base::StateSpacePtr(new ompl::base::SO2StateSpace),
-                    1.0);
-            break;
-        }
-        case urdf::Joint::PLANAR:
-        {
-            auto* subspace = new ompl::base::SE2StateSpace;
-            ompl::base::RealVectorBounds bounds(2);
-            bounds.setLow(-1.0);
-            bounds.setHigh(1.0);
-            subspace->setBounds(bounds);
-            concrete_space->addSubspace(ompl::base::StateSpacePtr(subspace), 1.0);
-            break;
-        }
-        case urdf::Joint::FLOATING:
-        {
-            auto* subspace = new ompl::base::SE3StateSpace();
-            ompl::base::RealVectorBounds bounds(3);
-            bounds.setLow(-1.0);
-            bounds.setHigh(1.0);
-            subspace->setBounds(bounds);
-            concrete_space->addSubspace(ompl::base::StateSpacePtr(subspace), 1.0);
-            break;
-        }
-        default:
-            ROS_WARN("Skip unrecognized joint type");
-            break;
-        }
-    }
-
-    return ompl::base::StateSpacePtr(concrete_space);
-}
-
-struct ProjectionEvaluatorFK : public ompl::base::ProjectionEvaluator
-{
-    smpl::KDLRobotModel* model = NULL;
-    const ompl::base::StateSpace* state_space = NULL;
-
-    using Base = ompl::base::ProjectionEvaluator;
-
-    ProjectionEvaluatorFK(const ompl::base::StateSpace* space);
-    ProjectionEvaluatorFK(const ompl::base::StateSpacePtr& space);
-
-    auto getDimension() const -> unsigned int override;
-    void project(
-            const ompl::base::State* state,
-            ompl::base::EuclideanProjection& projection) const override;
-    void setCellSizes(const std::vector<double>& cell_sizes) override;
-    void defaultCellSizes() override;
-    void setup() override;
-    void printSettings(std::ostream& out = std::cout) const override;
-    void printProjection(
-            const ompl::base::EuclideanProjection& projection,
-            std::ostream& out = std::cout) const override;
-};
-
-ProjectionEvaluatorFK::ProjectionEvaluatorFK(
-    const ompl::base::StateSpace* space)
-:
-    Base(space)
-{
-    state_space = space;
-}
-
-ProjectionEvaluatorFK::ProjectionEvaluatorFK(
-    const ompl::base::StateSpacePtr& space)
-:
-    Base(space)
-{
-    state_space = space.get();
-}
-
-auto ProjectionEvaluatorFK::getDimension() const -> unsigned int
-{
-    return 6;
-}
-
-void ProjectionEvaluatorFK::project(
-        const ompl::base::State* state,
-        ompl::base::EuclideanProjection& projection) const
-{
-    auto values = smpl::MakeStateSMPL(this->state_space, state);
-    auto pose = model->computeFK(values);
-    projection.resize(getDimension(), 0.0);
-    projection[0] = pose.translation().x();
-    projection[1] = pose.translation().y();
-    projection[2] = pose.translation().z();
-    smpl::angles::get_euler_zyx(
-            pose.rotation(), projection[3], projection[4], projection[5]);
-}
-
-void ProjectionEvaluatorFK::setCellSizes(const std::vector<double>& cell_sizes)
-{
-    this->Base::setCellSizes(cell_sizes);
-}
-
-void ProjectionEvaluatorFK::defaultCellSizes()
-{
-    this->Base::defaultCellSizes();
-}
-
-void ProjectionEvaluatorFK::setup()
-{
-    this->Base::setup();
-}
-
-void ProjectionEvaluatorFK::printSettings(std::ostream& out) const
-{
-    this->Base::printSettings(out);
-}
-
-void ProjectionEvaluatorFK::printProjection(
-    const ompl::base::EuclideanProjection& projection, std::ostream& out) const
-{
-    this->Base::printProjection(projection, out);
-}
-
-struct ExperimentConfig 
-{
-    // plan params
-    std::string ompl_planner;     
-    std::string roadmap_filename;
-    std::string crit_states_filename;
-    double allowed_planning_time;     
-    std::string exp_id;     
-
-    // plan res params
-    bool use_post_processing;     
     bool use_visualization; 
-    bool use_logging;    
-    std::string log_filename;         
+    bool use_logging; 
+    bool use_post_processing;
+    std::string log_filename; 
 }; 
 
-static 
-void ReadExperimentConfig(const ros::NodeHandle& nh, ExperimentConfig& cfg)
+bool ReadOMPLExperimentConfig(
+    const ros::NodeHandle& nh,
+    OMPLExperimentConfig& config) 
 {
-    nh.param<std::string>("ompl_planner", cfg.ompl_planner, "prm"); 
-    nh.param<std::string>("roadmap_filename", cfg.roadmap_filename, "");
-    nh.param<std::string>("crit_states_filename", cfg.crit_states_filename, "");
-    nh.param<double>("allowed_planning_time", cfg.allowed_planning_time, 60.0);
-    nh.param<std::string>("exp_id", cfg.exp_id, "0"); 
-    nh.param<bool>("use_post_processing", cfg.use_post_processing, true); 
-    nh.param<bool>("use_visualization", cfg.use_visualization, false);     
-    nh.param<bool>("use_logging", cfg.use_logging, false);     
+    if (!nh.getParam("planner_id", config.planner_id)) {
+        ROS_ERROR("Failed to read 'planner_id' from the param server");
+        return false;
+    } else {
+        ROS_INFO("Planner id: %s", config.planner_id.c_str()); 
+    }    
 
-    if (cfg.use_logging) {
-        nh.param<std::string>("log_filename", cfg.log_filename, ""); 
+    std::string critical_roadmap_dirs; 
+    if (!nh.getParam("roadmap_dir", critical_roadmap_dirs)) {
+        ROS_ERROR("Failed to read param 'roadmap_dir' from the param server");
+        return false;
     }
-}
 
+    std::string roadmap_label; 
+    if (!nh.getParam("roadmap_label", roadmap_label)) {
+        ROS_ERROR("Failed to read param 'roadmap_label' from the param server");
+        return false;
+    }    
+
+    config.roadmap_dir = critical_roadmap_dirs + roadmap_label; 
+    ROS_INFO("Roadmap dir: %s", config.roadmap_dir.c_str());    
+
+    if (!nh.getParam("planning_time", config.planning_time)) {
+        ROS_ERROR("Failed to read 'planning_time' from the param server");
+        return false;
+    } else {
+        ROS_INFO("Planning time: %f", config.planning_time); 
+    }    
+
+    if (!nh.getParam("exp_id", config.exp_id)) {
+        ROS_ERROR("Failed to read 'exp_id' from the param server");
+        return false;
+    } else {
+        ROS_INFO("Exp id: %s", config.exp_id.c_str()); 
+    }
+
+
+    if (!nh.getParam("animate", config.use_visualization)) {
+        ROS_ERROR("Failed to read param 'animate' from the param server");
+        return false;
+    } else {
+        ROS_INFO("Use visualization: %d", config.use_visualization); 
+    }    
+
+    if (!nh.getParam("logging", config.use_logging)) {
+        ROS_ERROR("Failed to read param 'logging' from the param server");
+        return false;
+    } else {
+        ROS_INFO("Use logging: %d", config.use_logging); 
+    }    
+
+    if (!nh.getParam("post_processing", config.use_post_processing)) {
+        ROS_ERROR("Failed to read param 'post_processing' from the param server");
+        return false;
+    } else {
+        ROS_INFO("Use post processing: %d", config.use_post_processing); 
+    }        
+
+    if (config.use_logging) {
+        if (!nh.getParam("log_filename", config.log_filename)) {
+            ROS_ERROR("Failed to read param 'log_filename' from the param server");
+            return false;
+        } else {
+            ROS_INFO("Log filename: %s", config.log_filename.c_str()); 
+        }            
+    }
+
+    return true; 
+}
+ 
 int main(int argc, char* argv[])
 {
     ros::init(argc, argv, "test_ompl_planner");
@@ -238,12 +167,6 @@ int main(int argc, char* argv[])
 
     // Let publishers set up
     ros::Duration(1.0).sleep();
-
-    //////////////////////
-    //  Read ROS Params // 
-    //////////////////////
-    ExperimentConfig cfg; 
-    ReadExperimentConfig(ph, cfg); 
 
     /////////////////
     // Robot Model //
@@ -410,7 +333,9 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto state_space = ConstructStateSpace(*urdf, robot_config.planning_joints);
+    auto state_space = ConstructWalkerStateSpaceWithDubinsBase(*urdf, 
+        robot_config.planning_joints);
+
 
     ompl::geometric::SimpleSetup ss(state_space);
 
@@ -421,6 +346,9 @@ int main(int argc, char* argv[])
         state_space->copyToReals(values, state);
         return cc.isStateValid(values);
     });
+
+    // Use Collision space as motion validator 
+    // ss.getSpaceInformation()->setMotionValidator(std::make_shared<WalkerMotionValidator>(state_space, cc)); 
 
     // Set up a projection evaluator to provide forward kinematics...
     auto* fk_projection = new ProjectionEvaluatorFK(state_space);
@@ -457,38 +385,45 @@ int main(int argc, char* argv[])
     }    
 
     ss.setGoalState(goal);
-
+    ss.getSpaceInformation()->setStateValidityCheckingResolution(0.005);
 
     // Initialize OMPL Planner 
-    ROS_INFO("Planning with %s", cfg.ompl_planner.c_str()); 
+
+    OMPLExperimentConfig cfg; 
+    ReadOMPLExperimentConfig(ros::NodeHandle("~planning"), cfg); 
+
     auto search_mode = ompl::geometric::CriticalPRM::QUERY; 
     
-    if (cfg.ompl_planner == "prm") {
-        auto prm = new ompl::geometric::CriticalPRM(ss.getSpaceInformation()); 
-        prm->setProblemDefinition(ss.getProblemDefinition()); 
-        prm->growRoadmapFromFile(cfg.roadmap_filename); 
-        prm->setMode(search_mode); 
-        ss.setPlanner(ompl::base::PlannerPtr(prm)); 
+    int expand_iters = 1e6; 
+
+    if (cfg.planner_id == "prm" || cfg.planner_id == "critical_prm") 
+    {
+        // Load PlannerData
+        auto pdata_storage = new ompl::base::PlannerDataStorage();         
+        ompl::base::PlannerData pdata(ss.getSpaceInformation());     
+        std::string pdata_filename = cfg.roadmap_dir + "/pdata_noncritical";         
+        pdata_storage->load(pdata_filename.c_str(), pdata);
+
+        auto prm = new ompl::geometric::CriticalPRM(pdata); 
+
+        if (cfg.planner_id == "critical_prm") {
+            // To Do: Add critical connections        
+            // crit_prm->addCriticalConnections(cfg.crit_states_filename); 
+            ROS_INFO("Not implemented yet"); 
+        }
 
         ROS_INFO("Initialized prm with %d vertices, %d edges", 
             prm->milestoneCount(), prm->edgeCount());         
 
-    } else if (cfg.ompl_planner == "critical_prm") {
-        auto crit_prm = new ompl::geometric::CriticalPRM(ss.getSpaceInformation());         
-        crit_prm->setProblemDefinition(ss.getProblemDefinition());         
-        crit_prm->growRoadmapFromFile(cfg.roadmap_filename);         
-        crit_prm->addCriticalConnections(cfg.crit_states_filename); 
-        crit_prm->setMode(search_mode);         
-        ss.setPlanner(ompl::base::PlannerPtr(crit_prm)); 
+        prm->setProblemDefinition(ss.getProblemDefinition()); 
+        prm->setMode(search_mode); 
+        ss.setPlanner(ompl::base::PlannerPtr(prm)); 
 
-        ROS_INFO("Initialized prm with %d vertices, %d edges",     
-            crit_prm->milestoneCount(), crit_prm->edgeCount());
-
-    } else if (cfg.ompl_planner == "rrt_connect") {
+    } else if (cfg.planner_id == "rrt_connect") {
         auto* rrtc = new ompl::geometric::RRTConnect(ss.getSpaceInformation());        
         ss.setPlanner(ompl::base::PlannerPtr(rrtc));         
     } else {
-        ROS_ERROR("Unrecognized OMPL planner %s", cfg.ompl_planner.c_str()); 
+        ROS_ERROR("Unrecognized OMPL planner %s", cfg.planner_id.c_str()); 
         return 0; 
     }
 
@@ -496,15 +431,17 @@ int main(int argc, char* argv[])
     // Planning //
     //////////////
 
-    auto solved = ss.solve(cfg.allowed_planning_time);
+    auto solved = ss.solve(cfg.planning_time);
 
     ///////////////////////////////////
     // Visualizations and Statistics //
     ///////////////////////////////////
 
+    auto found_path = ss.getSolutionPath(); 
+    found_path.interpolate(100);         
+    found_path.printAsMatrix(std::cout); 
+
     if (solved && cfg.use_visualization) {
-        auto found_path = ss.getSolutionPath(); 
-        found_path.interpolate(100);         
         size_t pidx = 0;
         while (ros::ok()) { 
             auto* state = found_path.getState(pidx);           
@@ -521,7 +458,7 @@ int main(int argc, char* argv[])
             SV_SHOW_INFO(cc.getCollisionWorldVisualization());
             SV_SHOW_INFO(cc.getOccupiedVoxelsVisualization());            
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
             pidx++;
             pidx %= found_path.getStateCount();            
         }

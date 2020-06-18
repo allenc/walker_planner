@@ -24,6 +24,34 @@ struct RobotModelConfig
     std::string chain_tip_link;
 };
 
+// old 
+// struct PlannerConfig
+// {
+//     std::string discretization;
+//     std::string mprim_filename;
+//     std::string mprim_filenames;
+//     bool use_multiple_ik_solutions;
+//     bool use_xyz_snap_mprim;
+//     bool use_rpy_snap_mprim;
+//     bool use_xyzrpy_snap_mprim;
+//     bool use_short_dist_mprims;
+//     double xyz_snap_dist_thresh;
+//     double rpy_snap_dist_thresh;
+//     double xyzrpy_snap_dist_thresh;
+//     double short_dist_mprims_thresh;
+//     double cost_per_cell;
+//     double inflation_radius_2d;
+//     double inflation_radius_3d;
+
+//     double eps;
+//     double eps_mha;
+//     int planning_time;
+//     int start_planning_episode;
+//     int end_planning_episode;
+//     int seed;
+//     std::vector<int> seeds;
+// };
+
 struct PlannerConfig
 {
     std::string discretization;
@@ -42,13 +70,17 @@ struct PlannerConfig
     double inflation_radius_2d;
     double inflation_radius_3d;
 
-    double eps;
-    double eps_mha;
-    int planning_time;
-    int start_planning_episode;
-    int end_planning_episode;
-    int seed;
-    std::vector<int> seeds;
+    std::string planner_id; 
+    double epsilon_anchor;
+    double epsilon_mha;
+    double planning_time;
+    bool use_visualization; 
+    bool use_post_processing;         
+    bool use_logging;     
+    std::string log_filename; 
+
+    std::string scenario; 
+    std::string exp_id;     
 };
 
 struct MultiRoomMapConfig {

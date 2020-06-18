@@ -72,13 +72,15 @@ class WalkerExperimentEditor():
 if __name__ == "__main__": 
 	# To Do: add arg parser
 
-	# init editor
-	exp_src_dir = "../experiments"
+	# Setup raw experiment files
+	exp_src_dir = "../critical_experiments/generated_raw_experiments"
 	f_start_configs = join(exp_src_dir, "start_states.txt")
 	f_goal_poses = join(exp_src_dir, "goal_poses.txt")
 	f_goal_configs = join(exp_src_dir, "goal_states.txt")
 
-	crit_roadmap_dir = "../critical_roadmaps/test"
+	# Setup critical state files
+	crit_roadmap_label = "grow60_s50_g2000" #test
+	crit_roadmap_dir = join("../critical_roadmaps", crit_roadmap_label)
 	# Note: f_crit_configs assumed to be sorted in decreasing criticality 
 	f_crit_configs = join(crit_roadmap_dir, "crit_roadmap_vertices.csv") 
 
@@ -88,5 +90,5 @@ if __name__ == "__main__":
 	# gen exp files
 	exp_label = "multi_room"
 	exp_dst_dir = join("../critical_experiments/", exp_label)
-	e.generate_formatted_experiments(exp_dst_dir, exp_label, topk_crit=3)
+	e.generate_formatted_experiments(exp_dst_dir, exp_label, topk_crit=20)
 

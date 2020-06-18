@@ -7,7 +7,7 @@
 #include <ros/ros.h>
 #include <smpl/graph/manip_lattice_action_space.h>
 #include <smpl/graph/manip_lattice.h>
-#include <smpl/graph/manip_lattice_walker.h>
+// #include <smpl/graph/manip_lattice_walker.h>
 #include <smpl/graph/motion_primitive.h>
 
 #include <smpl/heuristic/bfs_2d_heuristic.h>

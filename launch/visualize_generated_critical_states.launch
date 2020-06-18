@@ -3,7 +3,7 @@
 
     <arg name="debug" default="false"/>
     <arg name="top_k" default="10"/>    
-    <arg name="rvizconfig" default ="$(find walker_planner)/config/urdf.rviz" />
+    <arg name="rvizconfig" default ="$(find walker_planner)/config/default_walker_cfg.rviz" />            
 
     <include file="$(find walker_planner)/launch/planning_context_walker.launch"/>
 
@@ -15,8 +15,7 @@
     <!-- <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher"/> -->
     <!-- <node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher" /> -->
 
-    <!-- <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)"
-required="true" /> -->
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" required="true" />
 
     <node pkg="walker_planner" type="visualize_generated_critical_states" name="visualize_generated_critical_states"
             launch-prefix="$(arg launch-prefix)" output="screen">
@@ -47,34 +46,15 @@ required="true" /> -->
 
         <rosparam command="load" file="$(find walker_planner)/env/multi_room_map.yaml" />
 
-        <!-- planner params -->
-        <rosparam command="load" file="$(find walker_planner)/config/walker_right_arm.yaml"/>
-        <param name="planning/mprim_filename" value="$(find
-        walker_planner)/config/walker_multi_rep.mprim"/>
-
         <!-- critical roadmap construction params -->
-<!--         <param name = "using_star_strategy" value ="false"/>        
-        <param name = "roadmap_grow_time" value ="10.0"/>
-        <param name = "roadmap_expand_time" value ="10.0"/>
-        <param name = "save_dir" value ="$(find walker_planner)/critical_roadmaps/test/"/> -->
+        <rosparam command="load" file="$(find walker_planner)/config/critical_prm_construction.yaml"/>        
+        <param name="critical_config/roadmap_dir" value="$(find walker_planner)/critical_roadmaps/"/>        
 
-        <!-- <param name="allowed_planning_time" value="300.0"/> -->
-<!--         <param name="read_goal_from_file" value="true"/>
-        <param name="robot_start_states_file" value="$(find walker_planner)/experiments/walker_start_states.txt" />
-        <param name="robot_goal_states_file" value="$(find walker_planner)/experiments/walker_goal_states.txt" /> -->
-
-        <!-- 2. scene -->
-        <!-- 2.1 robot state -->
-<!--         <rosparam command="load" file="$(find
-        walker_planner)/experiments/walker_goal_mrmha.yaml"/> -->
+        <param name="top_k" value="$(arg top_k)"/>                
 
         <!-- 2.2 world state -->
         <rosparam command="load" file="$(find walker_planner)/env/multi_room_map.yaml" />
         <param name="object_filename" value="$(find walker_planner)/env/multi_rooms.env"/>
-
-        <param name="top_k" value="$(arg top_k)"/>        
-        
-        <!-- 3. scenario -->
 
     </node>
 </launch>

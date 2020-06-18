@@ -26,9 +26,11 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
 )
 
-
 find_package(orocos_kdl REQUIRED)
-find_package(Boost REQUIRED COMPONENTS unit_test_framework)
+# find_package(Boost COMPONENTS serialization system filesystem regex REQUIRED)
+find_package(Boost REQUIRED COMPONENTS serialization filesystem)
+
+# find_package(Boost COMPONENTS unit_test_framework filesystem system REQUIRED)
 find_package(OMPL REQUIRED)
 find_package(smpl REQUIRED)
 find_package(Eigen3 REQUIRED)
@@ -68,7 +70,7 @@ generate_messages(
 
 catkin_package(
 INCLUDE_DIRS include
-#  LIBRARIES walker
+LIBRARIES walker_planner
 CATKIN_DEPENDS geometry_msgs leatherman moveit_msgs moveit_ros_planning message_runtime std_msgs
 #orocos_kdl roscpp sbpl_collision_checking sbpl_kdl_robot_model smpl
 #smpl_ompl_interface smpl_moveit_interface visualization_msgs
@@ -84,11 +86,10 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-
-
 set( CRITICAL 
     src/critical_roadmap/critical_prm.cpp
-    src/critical_roadmap/critical_prm_constructor.cpp)
+    src/critical_roadmap/critical_prm_constructor.cpp
+    src/critical_roadmap/critical_common.cpp )
 
 set( PLANNERS
     src/planners/rmhaplanner.cpp)
@@ -100,7 +101,7 @@ set( AUXILIARY
 
 add_executable(collision_model_visualizer src/debug/collision_model_visualizer.cpp
     src/config/collision_space_scene.cpp)
-target_link_libraries(collision_model_visualizer ${catkin_LIBRARIES} smpl::smpl)
+target_link_libraries(collision_model_visualizer ${catkin_LIBRARIES} smpl::smpl )
 
 #add_executable( test_motion_planner
 #    src/mha/test_motion_planner.cpp
@@ -174,23 +175,26 @@ target_link_libraries(collision_model_visualizer ${catkin_LIBRARIES} smpl::smpl)
 # target_link_libraries(test_rmha_planner ${catkin_LIBRARIES} smpl::smpl ${orocos_kdl_LIBRARIES})
 # add_dependencies( test_rmha_planner ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} )
 
-add_executable( test_miastar_planner
-    src/test_miastar_planner.cpp
-    src/config/collision_space_scene.cpp
-    src/config/get_collision_objects.cpp
-    src/config/planner_config.cpp
-    ${CRITICAL}    
-    ${AUXILIARY})    
-target_link_libraries( test_miastar_planner ${catkin_LIBRARIES} smpl::smpl )
+# add_executable( test_miastar_planner
+#     src/test_miastar_planner.cpp
+#     src/config/collision_space_scene.cpp
+#     src/config/get_collision_objects.cpp
+#     src/config/planner_config.cpp
+#     ${CRITICAL}    
+#     ${AUXILIARY})    
+# target_compile_options(test_miastar_planner PUBLIC -lboost_system -lboost_filesystem -lboost_regex -lboost_serialization)
+# target_link_libraries( test_miastar_planner ${catkin_LIBRARIES} smpl::smpl ${Boost_SYSTEM_LIBRARY} ${Boost_SERIALIZATION_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} )
 
-add_executable( test_smha_planner
-    src/test_smha_planner.cpp
-    src/config/collision_space_scene.cpp
-    src/config/get_collision_objects.cpp
-    src/config/planner_config.cpp
-    ${CRITICAL}    
-    ${AUXILIARY})    
-target_link_libraries( test_smha_planner ${catkin_LIBRARIES} smpl::smpl )
+# add_executable( test_smha_planner
+#     src/test_smha_planner.cpp
+#     src/config/collision_space_scene.cpp
+#     src/config/get_collision_objects.cpp
+#     src/config/planner_config.cpp
+#     ${CRITICAL}    
+#     ${AUXILIARY})    
+# target_compile_options(test_smha_planner PUBLIC -lboost_system -lboost_filesystem -lboost_regex -lboost_serialization)
+# target_link_libraries( test_smha_planner ${catkin_LIBRARIES} smpl::smpl ${Boost_SYSTEM_LIBRARY} ${Boost_SERIALIZATION_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} )
+
 
 add_executable( test_ompl_planner
     src/test_ompl_planner.cpp
@@ -199,7 +203,7 @@ add_executable( test_ompl_planner
     src/config/planner_config.cpp
     ${CRITICAL}    
     ${AUXILIARY})    
-target_link_libraries( test_ompl_planner ${catkin_LIBRARIES} smpl::smpl )
+target_link_libraries( test_ompl_planner ${catkin_LIBRARIES} smpl::smpl ${Boost_SERIALIZATION_LIBRARY} )
 
 add_executable( generate_critical_states
   src/critical_roadmap/generate_critical_states.cpp
@@ -208,7 +212,8 @@ add_executable( generate_critical_states
   src/config/planner_config.cpp
   ${CRITICAL}
   ${AUXILIARY}) 
-target_link_libraries( generate_critical_states ${catkin_LIBRARIES} smpl::smpl )
+target_link_libraries( generate_critical_states ${catkin_LIBRARIES} smpl::smpl ${Boost_SERIALIZATION_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} )
+
 
 add_executable( visualize_generated_critical_states
   src/debug/visualize_generated_critical_states.cpp
@@ -217,25 +222,28 @@ add_executable( visualize_generated_critical_states
   src/config/planner_config.cpp
   ${CRITICAL}
   ${AUXILIARY})
-target_link_libraries( visualize_generated_critical_states ${catkin_LIBRARIES} smpl::smpl )
+target_link_libraries( visualize_generated_critical_states ${catkin_LIBRARIES} smpl::smpl ${Boost_SERIALIZATION_LIBRARY}  )
 
-add_executable( visualize_generated_roadmap_states
-  src/debug/visualize_generated_roadmap_states.cpp
-  src/config/collision_space_scene.cpp
-  src/config/get_collision_objects.cpp
-  src/config/planner_config.cpp
-  ${CRITICAL}
-  ${AUXILIARY})
-target_link_libraries( visualize_generated_roadmap_states ${catkin_LIBRARIES} smpl::smpl )
+# add_executable( visualize_generated_roadmap_states
+#   src/debug/visualize_generated_roadmap_states.cpp
+#   src/config/collision_space_scene.cpp
+#   src/config/get_collision_objects.cpp
+#   src/config/planner_config.cpp
+#   ${CRITICAL}
+#   ${AUXILIARY})
+# target_compile_options(visualize_generated_roadmap_states PUBLIC -lboost_system -lboost_filesystem -lboost_regex -lboost_serialization)
+# target_link_libraries( visualize_generated_roadmap_states ${catkin_LIBRARIES} smpl::smpl ${Boost_SYSTEM_LIBRARY} ${Boost_SERIALIZATION_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} )
 
-add_executable( visualize_experiment
-  src/debug/visualize_experiment.cpp
-  src/config/collision_space_scene.cpp
-  src/config/get_collision_objects.cpp
-  src/config/planner_config.cpp
-  ${CRITICAL}
-  ${AUXILIARY})
-target_link_libraries( visualize_experiment ${catkin_LIBRARIES} smpl::smpl )
+
+# add_executable( visualize_experiment
+#   src/debug/visualize_experiment.cpp
+#   src/config/collision_space_scene.cpp
+#   src/config/get_collision_objects.cpp
+#   src/config/planner_config.cpp
+#   ${CRITICAL}
+#   ${AUXILIARY})
+# target_compile_options(visualize_experiment PUBLIC -lboost_system -lboost_filesystem -lboost_regex -lboost_serialization)
+# target_link_libraries( visualize_experiment ${catkin_LIBRARIES} smpl::smpl ${Boost_SYSTEM_LIBRARY} ${Boost_SERIALIZATION_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} )
 
 add_executable(generate_map
     src/utils/generate_map.cpp

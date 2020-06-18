@@ -32,15 +32,14 @@ struct CriticalScoreComparator {
 
 struct ConstructionConfig
 {
-	bool using_star_strategy;
 	double grow_time; 
 	double expand_time; 
+	// int expand_iters; 
 
 	int num_sampled_starts; 
 	int num_sampled_goals_per_start; 	
 
-	bool save_roadmap;
-	std::string save_dir; 
+	std::string roadmap_dir; 
 }; 
 
 class CriticalPRMConstructor
@@ -60,7 +59,7 @@ private: // PRM member attributes
 	ompl::base::SpaceInformationPtr m_space; 
 	ompl::base::StateSpacePtr m_state_space; 
 
-	std::shared_ptr<ompl::geometric::CriticalPRM> m_prm_planner; 
+	std::shared_ptr<ompl::geometric::CriticalPRM> m_prm; 
 
 	using CriticalScoreMap = std::unordered_map<RobotState, int, VectorHash<double> >; 
 	CriticalScoreMap m_critical_score_map; 

@@ -8,190 +8,28 @@
 #include <algorithm>
 
 // system includes
-#include <eigen_conversions/eigen_msg.h>
+#include <ros/ros.h>
+#include <urdf_parser/urdf_parser.h>
 #include <kdl_conversions/kdl_msg.h>
+#include <eigen_conversions/eigen_msg.h>
 #include <leatherman/print.h>
 #include <leatherman/utils.h>
-#include <ompl/base/StateSpace.h>
-#include <ompl/base/spaces/RealVectorStateSpace.h>
-#include <ompl/base/spaces/SE2StateSpace.h>
-#include <ompl/base/spaces/SE3StateSpace.h>
-#include <ompl/base/spaces/SO2StateSpace.h>
+
+#include <ompl/base/PlannerData.h>
+#include <ompl/base/PlannerDataStorage.h> 
 #include <ompl/geometric/SimpleSetup.h>
-#include <ompl/geometric/planners/sbl/SBL.h>
-#include <ompl/geometric/planners/rrt/RRT.h>
-#include <ompl/geometric/planners/rrt/RRTConnect.h>
-#include <ompl/geometric/planners/bitstar/BITstar.h>
-#include <ros/ros.h>
 #include <sbpl_collision_checking/collision_space.h>
-#include <sbpl_kdl_robot_model/kdl_robot_model.h>
-#include <smpl/angles.h>
+
 #include <smpl/debug/visualizer_ros.h>
 #include <smpl/distance_map/euclid_distance_map.h>
-#include <smpl/planning_params.h>
-#include <smpl_ompl_interface/ompl_interface.h>
-#include <urdf_parser/urdf_parser.h>
 
+// project includes
 #include "critical_roadmap/critical_prm.h"
+#include "critical_roadmap/critical_common.h"
 #include "critical_roadmap/critical_prm_constructor.h"
 #include "config/planner_config.h"
 #include "config/collision_space_scene.h"
 #include "config/get_collision_objects.h"
-
-auto ConstructStateSpace(
-    const urdf::ModelInterface& urdf,
-    const std::vector<std::string>& planning_joints)
-    -> ompl::base::StateSpacePtr
-{
-    auto* concrete_space = new ompl::base::CompoundStateSpace;
-
-    for (auto& joint_name : planning_joints) {
-        auto joint = urdf.getJoint(joint_name);
-        switch (joint->type) {
-        case urdf::Joint::UNKNOWN:
-            return NULL;
-        case urdf::Joint::FIXED:
-            break;
-        case urdf::Joint::PRISMATIC:
-        case urdf::Joint::REVOLUTE:
-        {
-            auto* subspace = new ompl::base::RealVectorStateSpace(1);
-            if (joint->safety) {
-                subspace->setBounds(joint->safety->soft_lower_limit, joint->safety->soft_upper_limit);
-            } else if (joint->limits) {
-                if(joint_name == "x" )
-                    subspace->setBounds(0, 20);
-                else if(joint_name == "y")
-                    subspace->setBounds(0, 15);
-                else
-                subspace->setBounds(joint->limits->lower, std::min(joint->limits->upper, 20.0));
-            } else {
-                subspace->setBounds(-1.0, 1.0);
-            }
-
-            ompl::base::StateSpacePtr subspace_ptr(subspace);
-            concrete_space->addSubspace(subspace_ptr, 1.0);
-            break;
-        }
-        case urdf::Joint::CONTINUOUS:
-        {
-            concrete_space->addSubspace(
-                    ompl::base::StateSpacePtr(new ompl::base::SO2StateSpace),
-                    1.0);
-            break;
-        }
-        case urdf::Joint::PLANAR:
-        {
-            auto* subspace = new ompl::base::SE2StateSpace;
-            ompl::base::RealVectorBounds bounds(2);
-            bounds.setLow(-1.0);
-            bounds.setHigh(1.0);
-            subspace->setBounds(bounds);
-            concrete_space->addSubspace(ompl::base::StateSpacePtr(subspace), 1.0);
-            break;
-        }
-        case urdf::Joint::FLOATING:
-        {
-            auto* subspace = new ompl::base::SE3StateSpace();
-            ompl::base::RealVectorBounds bounds(3);
-            bounds.setLow(-1.0);
-            bounds.setHigh(1.0);
-            subspace->setBounds(bounds);
-            concrete_space->addSubspace(ompl::base::StateSpacePtr(subspace), 1.0);
-            break;
-        }
-        default:
-            ROS_WARN("Skip unrecognized joint type");
-            break;
-        }
-    }
-
-    return ompl::base::StateSpacePtr(concrete_space);
-}
-
-struct ProjectionEvaluatorFK : public ompl::base::ProjectionEvaluator
-{
-    smpl::KDLRobotModel* model = NULL;
-    const ompl::base::StateSpace* state_space = NULL;
-
-    using Base = ompl::base::ProjectionEvaluator;
-
-    ProjectionEvaluatorFK(const ompl::base::StateSpace* space);
-    ProjectionEvaluatorFK(const ompl::base::StateSpacePtr& space);
-
-    auto getDimension() const -> unsigned int override;
-    void project(
-            const ompl::base::State* state,
-            ompl::base::EuclideanProjection& projection) const override;
-    void setCellSizes(const std::vector<double>& cell_sizes) override;
-    void defaultCellSizes() override;
-    void setup() override;
-    void printSettings(std::ostream& out = std::cout) const override;
-    void printProjection(
-            const ompl::base::EuclideanProjection& projection,
-            std::ostream& out = std::cout) const override;
-};
-
-ProjectionEvaluatorFK::ProjectionEvaluatorFK(
-    const ompl::base::StateSpace* space)
-:
-    Base(space)
-{
-    state_space = space;
-}
-
-ProjectionEvaluatorFK::ProjectionEvaluatorFK(
-    const ompl::base::StateSpacePtr& space)
-:
-    Base(space)
-{
-    state_space = space.get();
-}
-
-auto ProjectionEvaluatorFK::getDimension() const -> unsigned int
-{
-    return 6;
-}
-
-void ProjectionEvaluatorFK::project(
-        const ompl::base::State* state,
-        ompl::base::EuclideanProjection& projection) const
-{
-    auto values = smpl::MakeStateSMPL(this->state_space, state);
-    auto pose = model->computeFK(values);
-    projection.resize(getDimension(), 0.0);
-    projection[0] = pose.translation().x();
-    projection[1] = pose.translation().y();
-    projection[2] = pose.translation().z();
-    smpl::angles::get_euler_zyx(
-            pose.rotation(), projection[3], projection[4], projection[5]);
-}
-
-void ProjectionEvaluatorFK::setCellSizes(const std::vector<double>& cell_sizes)
-{
-    this->Base::setCellSizes(cell_sizes);
-}
-
-void ProjectionEvaluatorFK::defaultCellSizes()
-{
-    this->Base::defaultCellSizes();
-}
-
-void ProjectionEvaluatorFK::setup()
-{
-    this->Base::setup();
-}
-
-void ProjectionEvaluatorFK::printSettings(std::ostream& out) const
-{
-    this->Base::printSettings(out);
-}
-
-void ProjectionEvaluatorFK::printProjection(
-    const ompl::base::EuclideanProjection& projection, std::ostream& out) const
-{
-    this->Base::printProjection(projection, out);
-}
 
 int main(int argc, char* argv[])
 {
@@ -357,12 +195,6 @@ int main(int argc, char* argv[])
 
     cc.setWorldToModelTransform(Eigen::Affine3d::Identity());
 
-    //SV_SHOW_INFO(grid.getDistanceFieldVisualization(0.2));
-
-    //SV_SHOW_INFO(cc.getCollisionRobotVisualization());
-    //SV_SHOW_INFO(cc.getCollisionWorldVisualization());
-    //SV_SHOW_INFO(cc.getOccupiedVoxelsVisualization());
-
     ///////////////////
     // Planner Setup //
     ///////////////////
@@ -376,7 +208,8 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto state_space = ConstructStateSpace(*urdf, robot_config.planning_joints);
+    auto state_space = ConstructWalkerStateSpaceWithDubinsBase(*urdf, 
+        robot_config.planning_joints);
 
     ompl::geometric::SimpleSetup ss(state_space);
 
@@ -398,6 +231,7 @@ int main(int argc, char* argv[])
     // Planning //
     //////////////
 
+    // To Do: change this so it passes pdef, space, state space directly and not ss 
     ROS_INFO("Setup the query");
 
     // Initialize random start/goal, only for ss setup not used in crit prm construction
@@ -409,43 +243,88 @@ int main(int argc, char* argv[])
     goal.random(); 
     ss.setGoalState(goal); 
 
-    // Initialize critical roadmap construction parameters 
-    smpl::ConstructionConfig cfg; // To Do: Move these to rosparams
-    cfg.using_star_strategy = false; 
-    cfg.grow_time = 60.0; 
-    cfg.expand_time = 1.0;     
-    cfg.num_sampled_starts = 50; 
-    cfg.num_sampled_goals_per_start = 200; 
-    cfg.save_roadmap = true; 
-    cfg.save_dir = "/home/allen/catkin_ws/src/walker_planner/critical_roadmaps/test"; 
+    ss.getSpaceInformation()->setStateValidityCheckingResolution(0.005);
+    ss.setup();     
 
-    ss.setup(); 
+    // Read Critical Roadmap Construction Parameters
+    smpl::ConstructionConfig cfg; 
+    if (!ReadCriticalConstructionConfig(ros::NodeHandle("~critical_config"), cfg)) {
+        ROS_ERROR("Failed to read construction parameters"); 
+    }
 
     // Construct Critical PRM 
-    // auto crit_ctor = smpl::CriticalPRMConstructor(ss, cfg);
-    // crit_ctor.constructCriticalPRM(); 
-
+    auto crit_ctor = smpl::CriticalPRMConstructor(ss, cfg); 
+    crit_ctor.constructCriticalPRM(); 
 
     // Test loading prm 
-    std::string f_grown_milestones = "/home/allen/catkin_ws/src/walker_planner/critical_roadmaps/test/load/grown_milestones.csv"; 
-    auto prm = new ompl::geometric::CriticalPRM(ss.getSpaceInformation()); 
-    prm->setProblemDefinition(ss.getProblemDefinition()); 
-    prm->growRoadmapFromFile(f_grown_milestones); 
-        ROS_ERROR("Initialized prm with %d vertices, %d edges", 
-            prm->milestoneCount(), prm->edgeCount());     
+    auto pdata_storage = new ompl::base::PlannerDataStorage(); 
+    std::string pdata_filename = cfg.roadmap_dir + "/pdata_noncritical"; 
+    ompl::base::PlannerData pdata(ss.getSpaceInformation());     
+    pdata_storage->load(pdata_filename.c_str(), pdata);
+
+    auto prm = new ompl::geometric::CriticalPRM(pdata); 
+    ROS_ERROR("Initialized prm with %d vertices, %d edges", 
+        prm->milestoneCount(), prm->edgeCount());     
 
     return 0; 
 
 
-    // Vis 
-    ROS_INFO("Visualizing scene"); 
-    while (ros::ok()) {
-        SV_SHOW_INFO(cc.getCollisionRobotVisualization());
-        SV_SHOW_INFO(cc.getCollisionWorldVisualization());
-        SV_SHOW_INFO(grid.getOccupiedVoxelsVisualization());        
-        SV_SHOW_INFO(grid.getBoundingBoxVisualization());                        
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));        
-    }
+    // below is old 
+
+    // // Initialize critical roadmap construction parameters 
+    // smpl::ConstructionConfig cfg; // To Do: Move these to rosparams
+    // cfg.using_star_strategy = false; 
+
+    // // test params
+    // // cfg.grow_time = 10.0; 
+    // // cfg.expand_time = 0.0;    
+    // // cfg.expand_iters = 1e2; 
+    // // cfg.num_sampled_starts = 1; 
+    // // cfg.num_sampled_goals_per_start = 3;
+
+    // cfg.grow_time =300.0; 
+    // cfg.expand_iters = 1e6;
+    // // cfg.expand_time = 120.0;
+    // cfg.num_sampled_starts = 50; 
+    // cfg.num_sampled_goals_per_start = 200; 
+    // cfg.save_roadmap = true; 
+    // std::string crit_road_dir = "/home/allen/catkin_ws/src/walker_planner/critical_roadmaps/"; 
+    // std::string crit_road_label = "grow300_expand300_s50_g2000_dubins0_17"; 
+    // cfg.save_dir = crit_road_dir + crit_road_label; 
+
+
+    // ss.getSpaceInformation()->setStateValidityCheckingResolution(0.005);
+    // ss.setup(); 
+
+    // // Construct Critical PRM 
+    // auto crit_ctor = smpl::CriticalPRMConstructor(ss, cfg);
+    // crit_ctor.constructCriticalPRM(); 
+
+
+    // // Test loading prm 
+    // // std::string f_grown_milestones = cfg.save_dir + "/load/grown_milestones.csv"; 
+    // // auto prm = new ompl::geometric::CriticalPRM(ss.getSpaceInformation()); 
+    // // prm->setProblemDefinition(ss.getProblemDefinition()); 
+    // // prm->growRoadmapFromFile(f_grown_milestones); 
+
+
+    // // prm->seed(7); 
+    // // prm->expandRoadmap(cfg.expand_iters); 
+    // //     ROS_ERROR("Initialized prm with %d vertices, %d edges", 
+    // //         prm->milestoneCount(), prm->edgeCount());     
+
+    // // return 0; 
+
+
+    // // Vis 
+    // ROS_INFO("Visualizing scene"); 
+    // while (ros::ok()) {
+    //     SV_SHOW_INFO(cc.getCollisionRobotVisualization());
+    //     SV_SHOW_INFO(cc.getCollisionWorldVisualization());
+    //     SV_SHOW_INFO(grid.getOccupiedVoxelsVisualization());        
+    //     SV_SHOW_INFO(grid.getBoundingBoxVisualization());                        
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(10));        
+    // }
     
-    return 0;
+    // return 0;
 }
